@@ -1,0 +1,29 @@
+/* Estilos para el selector de espacios */
+
+/* Aseguramos que los items del select tengan hover */
+.space-item:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  cursor: pointer !important;
+}
+
+/* Aplicamos estilos al input de búsqueda para que no pierda el foco */
+.space-select-content input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+  border-color: var(--ring);
+}
+
+/* Evitamos que el dropdown se cierre al hacer click en el input */
+.space-select-content .space-search-container {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: white;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Estilo para cuando un item está seleccionado */
+.space-item[data-state="checked"] {
+  background-color: rgba(0, 0, 0, 0.05);
+}

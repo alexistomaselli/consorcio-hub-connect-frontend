@@ -1,0 +1,139 @@
+.header {
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 1rem 2rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    width: 100%;
+}
+
+.header-content {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.nav-menu {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+}
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: white;
+    min-width: 200px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    padding: 0.5rem 0;
+    z-index: 1000;
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+.dropdown-item {
+    display: block;
+    padding: 0.5rem 1rem;
+    color: #4b5563;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+    background-color: #f3f4f6;
+    color: #1e40af;
+}
+
+.dropdown-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    color: #4b5563;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.dropdown-toggle:hover {
+    color: #1e40af;
+}
+
+.dropdown-toggle i {
+    font-size: 0.8rem;
+}
+
+.directory-tree {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.4;
+    padding: 1.5rem;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 0.5rem;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.directory-tree .comment {
+    color: #6a9955;
+    margin-left: 8px;
+}
+
+.logo-text {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #1e40af;
+}
+
+.nav-menu {
+    display: flex;
+    gap: 1rem;
+}
+
+.nav-link {
+    color: #1e40af;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+    background-color: #e0e7ff;
+}
+
+.nav-link.active {
+    background-color: #1e40af;
+    color: white;
+}
+
+.nav-link:hover {
+    background-color: #f0f9ff;
+}
+
+.nav-link.active {
+    background-color: #1e40af;
+    color: white;
+}
+
+/* Ajuste para el contenido debajo del header fijo */
+body {
+    padding-top: 4rem;
+}

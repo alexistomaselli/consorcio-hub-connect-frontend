@@ -1,0 +1,68 @@
+[
+   {
+      "claims" : [],
+      "description" : "Hall de entrada principal",
+      "floor" : "PB",
+      "id" : "b0e403a9-99c0-4654-8fff-663f37c9a256",
+      "name" : "Hall de entrada",
+      "owners" : [],
+      "spaceTypeId" : "4e7cef49-de41-41ab-ab27-98959d87fa2d",
+      "type" : {
+         "description" : "Áreas comunes del edificio",
+         "id" : "4e7cef49-de41-41ab-ab27-98959d87fa2d",
+         "isAssignable" : false,
+         "isReservable" : true,
+         "name" : "Espacio común"
+      }
+   },
+   {
+      "claims" : [],
+      "description" : "Unidad 51 en piso 5",
+      "floor" : "5",
+      "id" : "8bbb7ca6-c170-45de-9326-98dc8707a76d",
+      "name" : "51",
+      "owners" : [
+         {
+            "email" : "juanvelasco9888@gmail.com",
+            "firstName" : "Alexis 2",
+            "id" : "dd230d73-6a35-4003-860c-d22467090b01",
+            "isMain" : false,
+            "lastName" : "Tomaselli",
+            "userId" : "dd230d73-6a35-4003-860c-d22467090b01"
+         }
+      ],
+      "spaceTypeId" : "c4c1d0d2-839b-40ee-9a61-ce7c400f8caf",
+      "type" : {
+         "description" : "Apartamentos o unidades habitacionales del edificio",
+         "id" : "c4c1d0d2-839b-40ee-9a61-ce7c400f8caf",
+         "isAssignable" : true,
+         "isReservable" : false,
+         "name" : "Unidad"
+      }
+   },
+   {
+      "claims" : [],
+      "description" : "Unidad 52 en piso 5",
+      "floor" : "5",
+      "id" : "8a8c1426-4fc6-43d8-906e-3debaa5a53a9",
+      "name" : "52",
+      "owners" : [
+         {
+            "email" : "juanvelasco9888@gmail.com",
+            "firstName" : "Alexis 2",
+            "id" : "dd230d73-6a35-4003-860c-d22467090b01",
+            "isMain" : false,
+            "lastName" : "Tomaselli",
+            "userId" : "dd230d73-6a35-4003-860c-d22467090b01"
+         }
+      ],
+      "spaceTypeId" : "c4c1d0d2-839b-40ee-9a61-ce7c400f8caf",
+      "type" : {
+         "description" : "Apartamentos o unidades habitacionales del edificio",
+         "id" : "c4c1d0d2-839b-40ee-9a61-ce7c400f8caf",
+         "isAssignable" : true,
+         "isReservable" : false,
+         "name" : "Unidad"
+      }
+   }
+]

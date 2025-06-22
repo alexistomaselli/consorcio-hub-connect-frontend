@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración de Base de Datos - ConsorcioHub</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="components/header.js"></script>
+<body>
+    <script>insertHeader();</script>
+    <div class="content-wrapper">
+        <div class="slide">
+            <div class="accent-bar"></div>
+            <div class="blueprint-bg"></div>
+            <div class="p-14 relative z-10">
+        <h1 class="text-4xl font-bold mb-8 text-blue-600">Configuración de Base de Datos</h1>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Arquitectura de Docker</h2>
+            <div class="mb-6">
+                <img src="https://mermaid.ink/img/pako:eNp1kc1OwzAQhF_F2nMq9Q_1AQeQEKhSJQ5wQByctN14Iok38jpqleDdWTtpgwCJ0672-2Y8Xm8wNZqgglxbp1tpYGW0sTDVrYHKLqR2cAcvRsEjvJVwjwCvEqRWGZiBNXVrYaZ1DhfzxQyWxhUQnkJ4CiGEyRQWYHMHViq4hOAcQvDh8jxcQAhX4-n1-Cz8F8ZkYIxUdg2VsGvAHOTG5qBEITKRC2VyJQvIVSlyLnKei5KLPC-VyLnMVClyqUQuc5mJTOQiV6LMZZlLlUklVC6UVEqoUhQyU1KqUuZK5VJmWZaLLJO5yGQmc5nJTGQik0oqJVQps0wKVWYiL0uZZTKXSshSlEIoIQspVVkKWRZZWWQiL5XIy0xmhZBKlLIsRKFEVkghVZEJVWaFEKqQQpWFKESZyaKQWVYIVRSyKGQhVSFUJlQhVCFVVghZFEIWQhWZKHNZlEKWQpWFkFKWQkghVSFVIVUmVCFULlUuZS5LIXMppFSlkLmUuZBCqVLIXEqZSyWlVFLmUspCylxKmQspC6mkzKWUuZQyl1LmUkqZSyFzKWUupZS5lDKXUspcSpnLf7PHPwvpDVY9NJBjZ6Ey2GFTa4cPO2yxwc7iO1aIVYefeN_jB961eGDfYtVg9YnfeN_hnj3in8NqZ7D6wgMeOnzEQ4NHrGz3F_5_dYw" alt="Arquitectura Docker" class="w-full mb-4">
+                <p class="text-gray-600 mb-4">La arquitectura de nuestra base de datos en Docker consiste en dos contenedores principales:</p>
+                <ul class="list-disc pl-6 mb-4 text-gray-600">
+                    <li><strong>PostgreSQL:</strong> Ejecutándose en el puerto interno 5432</li>
+                    <li><strong>pgAdmin:</strong> Interfaz web para administrar la base de datos</li>
+                </ul>
+            </div>
+
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Mapeo de Puertos</h2>
+            <div class="bg-gray-50 rounded p-4 mb-6">
+                <h3 class="text-xl font-semibold mb-2 text-blue-600">PostgreSQL</h3>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-white p-4 rounded shadow">
+                        <h4 class="font-semibold mb-2">Puerto Interno (Contenedor)</h4>
+                        <p class="text-gray-600">5432</p>
+                    </div>
+                    <div class="bg-white p-4 rounded shadow">
+                        <h4 class="font-semibold mb-2">Puerto Externo (Host)</h4>
+                        <p class="text-gray-600">5433</p>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Conexión a la Base de Datos</h2>
+            <div class="grid grid-cols-2 gap-6 mb-6">
+                <div class="bg-gray-50 p-4 rounded">
+                    <h3 class="text-xl font-semibold mb-2 text-blue-600">Desde la Aplicación</h3>
+                    <pre class="bg-gray-800 text-white p-4 rounded overflow-x-auto">
+DATABASE_URL="postgresql://admin:admin123@localhost:5433/consorcio_hub"</pre>
+                    <p class="mt-2 text-gray-600">Usa el puerto externo (5433) porque se conecta desde fuera de Docker</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded">
+                    <h3 class="text-xl font-semibold mb-2 text-blue-600">Desde pgAdmin</h3>
+                    <pre class="bg-gray-800 text-white p-4 rounded overflow-x-auto">
+Host: postgres
+Port: 5432
+Database: consorcio_hub
+Username: admin
+Password: admin123</pre>
+                    <p class="mt-2 text-gray-600">Usa el puerto interno (5432) porque está dentro de la red Docker</p>
+                </div>
+            </div>
+
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Acceso a pgAdmin</h2>
+            <div class="bg-gray-50 p-4 rounded mb-6">
+                <p class="text-gray-600 mb-4">Para acceder a la interfaz web de pgAdmin:</p>
+                <ol class="list-decimal pl-6 text-gray-600">
+                    <li class="mb-2">Abre <a href="http://localhost:5051" class="text-blue-600 hover:underline">http://localhost:5051</a></li>
+                    <li class="mb-2">Usa las siguientes credenciales:
+                        <ul class="list-disc pl-6 mt-2">
+                            <li>Email: admin@admin.com</li>
+                            <li>Password: admin123</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+        </div>
+            </div>
+        </div>
+    </div>
+
+<div class="text-center mt-12">
+  <a href="index.html" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow">
+    ← Volver al índice de documentación
+  </a>
+</div>
+</body>
+</html>

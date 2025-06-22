@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Propietarios - Documentación</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+    <script src="components/header.js"></script>
+    <style>
+        /* Estilos específicos para la documentación de propietarios */
+        :root {
+            --primary-color: #2563eb;
+            --text-color: #1f2937;
+            --bg-color: #ffffff;
+            --code-bg: #1e293b;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            color: #4a5568;
+        }
+
+        h2 {
+            color: #2563eb;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        h3 {
+            color: #1a56db;
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        h4 {
+            color: #2d3748;
+            font-size: 1.125rem;
+            font-weight: 500;
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        p, ul, ol {
+            margin-bottom: 1rem;
+        }
+
+        ul, ol {
+            padding-left: 2rem;
+        }
+
+        code {
+            font-family: 'Fira Code', Consolas, Monaco, 'Andale Mono', monospace;
+            background: var(--code-bg);
+            color: #e2e8f0;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-size: 0.9em;
+        }
+
+        pre {
+            background: var(--code-bg);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        pre code {
+            padding: 0;
+            background: none;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 2rem;
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 2rem;
+            height: calc(100vh - 4rem);
+            overflow-y: auto;
+            padding-right: 1rem;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .sidebar li {
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .sidebar a:hover {
+            color: var(--primary-color);
+        }
+
+        .content {
+            min-width: 0;
+        }
+
+        .interface {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .interface h4 {
+            margin-top: 0;
+            color: var(--text-color);
+        }
+
+        .api-endpoint {
+            background-color: #f8fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border: 1px solid #e2e8f0;
+        }
+
+        .method {
+            font-weight: 600;
+            color: #059669;
+        }
+
+        .path {
+            color: #3b82f6;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .description {
+            margin-top: 0.5rem;
+            color: #64748b;
+        }
+
+        .parameters {
+            margin-top: 1rem;
+        }
+
+        .parameter {
+            margin: 0.5rem 0;
+            padding-left: 1rem;
+        }
+
+        .parameter-name {
+            font-weight: 600;
+            color: #dc2626;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .parameter-type {
+            color: #64748b;
+            font-style: italic;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .content-section {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .content-section {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <script>insertHeader();</script>
+    <div class="content-wrapper">
+        <div class="slide">
+            <div class="accent-bar"></div>
+            <div class="blueprint-bg"></div>
+            <div class="p-14 relative z-10">
+                <h1 class="text-blue-600 text-3xl font-semibold mb-8">Sistema de Gestión de Propietarios</h1>
+            
+            <div class="grid grid-cols-2 gap-10">
+
+        <main class="content">
+            <h1>Sistema de Gestión de Propietarios</h1>
+
+            <section id="vision-general">
+                <h2>Visión General</h2>
+                <p>El sistema de gestión de propietarios permite manejar eficientemente la relación entre propietarios y edificios, considerando que un propietario puede tener unidades en múltiples edificios mientras mantiene una única identidad en el sistema.</p>
+            </section>
+
+            <section id="arquitectura">
+                <h2>Arquitectura</h2>
+
+                <section id="sistema-identidad">
+                    <h3>1. Sistema de Identidad Global</h3>
+
+                    <div class="interface">
+                        <h4>Propietario Global</h4>
+                        <pre><code class="language-typescript">interface GlobalOwner {
+  id: string;
+  firstName: string;
+  lastName: string;
+  documentType: DocumentType;
+  documentNumber: string;
+  email: string;
+  phone?: string;
+  whatsappNumber?: string;
+  address?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}</code></pre>
+                    </div>
+
+                    <div class="interface">
+                        <h4>Vinculación con Edificios</h4>
+                        <pre><code class="language-typescript">interface BuildingOwnership {
+  globalOwnerId: string;
+  buildingId: string;
+  units: string[];  // IDs de las unidades en este edificio
+  notificationPreferences: {
+    email: boolean;
+    whatsapp: boolean;
+    push: boolean;
+    types: {
+      claims: boolean;
+      expenses: boolean;
+      documents: boolean;
+      meetings: boolean;
+    }
+  };
+  status: 'ACTIVE' | 'INACTIVE';
+  createdAt: Date;
+  updatedAt: Date;
+}</code></pre>
+                    </div>
+                </section>
+
+                <section id="sistema-invitaciones">
+                    <h3>2. Sistema de Invitaciones</h3>
+
+                    <div class="interface">
+                        <h4>Invitación</h4>
+                        <pre><code class="language-typescript">interface Invitation {
+  id: string;
+  buildingId: string;
+  email: string;
+  documentType: DocumentType;
+  documentNumber: string;
+  token: string;
+  units: string[];
+  status: 'PENDING' | 'ACCEPTED' | 'EXPIRED';
+  expiresAt: Date;
+  createdAt: Date;
+}</code></pre>
+                    </div>
+                </section>
+            </section>
+
+            <section id="flujos-trabajo">
+                <h2>Flujos de Trabajo</h2>
+
+                <section id="registro-propietario">
+                    <h3>1. Registro de Propietario por Invitación</h3>
+                    <h4>Creación de Invitación</h4>
+                    <ul>
+                        <li>Admin ingresa datos del propietario y unidades</li>
+                        <li>Sistema verifica si ya existe el propietario</li>
+                        <li>Genera token único de invitación</li>
+                        <li>Envía email con link de invitación</li>
+                    </ul>
+
+                    <h4>Proceso de Registro</h4>
+                    <ul>
+                        <li>Propietario accede al link de invitación</li>
+                        <li>Sistema verifica validez del token</li>
+                        <li>Si el propietario ya existe:
+                            <ul>
+                                <li>Login normal</li>
+                                <li>Vinculación automática con el edificio</li>
+                            </ul>
+                        </li>
+                        <li>Si es nuevo propietario:
+                            <ul>
+                                <li>Formulario de registro</li>
+                                <li>Creación de cuenta</li>
+                                <li>Vinculación con edificio</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </section>
+
+                <section id="gestion-accesos">
+                    <h3>2. Gestión de Accesos</h3>
+                    
+                    <div class="interface">
+                        <h4>Control de Acceso al Edificio</h4>
+                        <pre><code class="language-typescript">interface BuildingAccess {
+  ownerId: string;
+  buildingId: string;
+  accessLevel: 'FULL' | 'READONLY';
+  features: {
+    claims: boolean;
+    expenses: boolean;
+    documents: boolean;
+    meetings: boolean;
+  };
+}</code></pre>
+                    </div>
+
+                    <h4>Transferencia de Propiedad</h4>
+                    <ul>
+                        <li>Revocación de acceso a unidad específica</li>
+                        <li>Mantenimiento de acceso a otras unidades</li>
+                        <li>Proceso de invitación para nuevo propietario</li>
+                    </ul>
+                </section>
+
+                <section id="dashboard-propietario">
+                    <h3>3. Dashboard de Propietario</h3>
+                    <h4>Vista Multi-edificio</h4>
+                    <ul>
+                        <li>Lista de edificios donde tiene unidades</li>
+                        <li>Resumen de estado por edificio:
+                            <ul>
+                                <li>Reclamos activos</li>
+                                <li>Expensas pendientes</li>
+                                <li>Documentos nuevos</li>
+                                <li>Próximas reuniones</li>
+                            </ul>
+                        </li>
+                    </ul>
+
+                    <h4>Preferencias por Edificio</h4>
+                    <ul>
+                        <li>Configuración de notificaciones</li>
+                        <li>Método de contacto preferido</li>
+                        <li>Visualización de información</li>
+                    </ul>
+                </section>
+            </section>
+
+            <section id="seguridad">
+                <h2>Consideraciones de Seguridad</h2>
+                
+                <h3>1. Privacidad</h3>
+                <ul>
+                    <li>Los propietarios solo ven edificios donde tienen unidades</li>
+                    <li>Información sensible segregada por edificio</li>
+                    <li>Tokens de invitación con expiración</li>
+                </ul>
+
+                <h3>2. Autenticación</h3>
+                <ul>
+                    <li>Verificación de email</li>
+                    <li>Validación de documento</li>
+                    <li>Rate limiting en invitaciones</li>
+                </ul>
+
+                <h3>3. Auditoría</h3>
+                <ul>
+                    <li>Log de cambios de propiedad</li>
+                    <li>Registro de accesos</li>
+                    <li>Historial de notificaciones</li>
+                </ul>
+            </section>
+
+            <section id="api">
+                <h2>API Endpoints</h2>
+
+                <h3>Invitaciones</h3>
+                <pre><code class="language-typescript">POST /buildings/:buildingId/invitations
+GET /api/invitations/:token
+POST /api/invitations/:token/accept</code></pre>
+
+                <h3>Propietarios</h3>
+                <pre><code class="language-typescript">GET /api/owners/me
+GET /buildings/:buildingId/owners
+POST /buildings/:buildingId/owners
+PATCH /buildings/:buildingId/owners/:ownerId</code></pre>
+
+                <h3>Unidades</h3>
+                <pre><code class="language-typescript">GET /buildings/:buildingId/units
+PATCH /buildings/:buildingId/units/:unitId/owner</code></pre>
+            </section>
+
+            <div class="mt-auto flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                        <i class="fas fa-users text-blue-600"></i>
+                    </div>
+                    <p class="text-gray-500">Sistema de gestión de propietarios con soporte multi-edificio</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+
+<div class="text-center mt-12">
+  <a href="index.html" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow">
+    ← Volver al índice de documentación
+  </a>
+</div>
+</body>
+</html>

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesos - Consorcio Hub Connect</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .content-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding-top: 80px;
+            min-height: calc(100vh - 80px);
+        }
+        
+        .slide {
+            width: 1280px;
+            min-height: 720px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8faff 100%);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            margin: 2rem;
+        }
+        
+        .accent-bar {
+            height: 8px;
+            background: linear-gradient(90deg, #1a56db 0%, #4f46e5 50%, #7c3aed 100%);
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        .blueprint-bg {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 40%;
+            height: 100%;
+            background-image: linear-gradient(rgba(240, 249, 255, 0.8), rgba(240, 249, 255, 0.8)),
+                url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%233b82f6' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+            z-index: 0;
+            opacity: 0.6;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: white;
+            border-right: 1px solid #e5e7eb;
+            height: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            padding-top: 80px;
+            overflow-y: auto;
+        }
+
+        .sidebar-nav {
+            padding: 1rem;
+        }
+
+        .sidebar-nav h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #4b5563;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+        }
+
+        .nav-item {
+            display: block;
+            padding: 0.5rem 1rem;
+            color: #374151;
+            text-decoration: none;
+            border-radius: 0.375rem;
+            margin-bottom: 0.25rem;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover {
+            background-color: #f3f4f6;
+            color: #1d4ed8;
+        }
+
+        .nav-item.active {
+            background-color: #e0e7ff;
+            color: #1d4ed8;
+            font-weight: 500;
+        }
+
+        .main-content {
+            margin-left: 280px;
+        }
+    </style>
+    <script src="components/header.js"></script>
+</head>
+<body>
+    <!-- El header se insertará aquí mediante JavaScript -->
+    <nav class="sidebar">
+        <div class="sidebar-nav">
+            <h3>Procesos</h3>
+            <a href="#registro" class="nav-item active">1. Registro de Edificio</a>
+            <div class="pl-4">
+                <a href="#registro-basico" class="nav-item">1.1 Registro Básico</a>
+                <a href="#verificacion-email" class="nav-item">1.2 Verificación Email</a>
+                <a href="#perfil-completo" class="nav-item">1.3 Perfil Completo</a>
+                <a href="#config-whatsapp" class="nav-item">1.4 Config. WhatsApp</a>
+            </div>
+            <h3 class="mt-6">Procesos Adicionales</h3>
+            <a href="#espacios" class="nav-item">2. Gestión de Espacios</a>
+            <div class="pl-4">
+                <a href="#espacios-tipos" class="nav-item">2.1 Gestión de Tipos</a>
+                <a href="#espacios-creacion" class="nav-item">2.2 Creación de Espacios</a>
+                <a href="#espacios-edicion" class="nav-item">2.3 Edición y Eliminación</a>
+                <a href="#espacios-propietarios" class="nav-item">2.4 Asignación de Propietarios</a>
+            </div>
+            <a href="#invitacion" class="nav-item">3. Registro de Propietarios</a>
+            <div class="pl-4">
+                <a href="#invitacion-enviar" class="nav-item">3.1 Envío de Invitaciones</a>
+                <a href="#invitacion-seguimiento" class="nav-item">3.2 Seguimiento</a>
+                <a href="#invitacion-completar" class="nav-item">3.3 Registro del Propietario</a>
+            </div>
+            <h3 class="mt-6">Próximamente</h3>
+            <a href="#" class="nav-item" style="opacity: 0.5">4. Gestión de Pagos</a>
+            <a href="#" class="nav-item" style="opacity: 0.5">5. Gestión de Reclamos</a>
+        </div>
+    </nav>
+
+    <div class="main-content">
+        <div class="content-wrapper">
+            <div class="slide">
+                <div class="accent-bar"></div>
+                <div class="blueprint-bg"></div>
+            
+            <div class="p-14 relative z-10 h-full flex flex-col">
+                <h1 id="registro" class="text-3xl font-bold mb-8">Proceso 1: Registro de Edificio 🏢</h1>
+
+                <div class="space-y-8">
+                    <div id="registro-basico" class="bg-white p-6 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-semibold mb-4">Subproceso 1.1: Registro Básico ✍️</h2>
+                        <p class="text-gray-600 mb-4">El proceso de registro básico permite crear una cuenta inicial para el edificio:</p>
+                        <ol class="list-decimal pl-6 space-y-2">
+                            <li>Acceder a la página de registro</li>
+                            <li>Seleccionar el plan deseado para el consorcio</li>
+                            <li>Completar el formulario con:
+                                <ul class="list-disc pl-6 mt-2">
+                                    <li>Nombre y apellido del administrador</li>
+                                    <li>Email de contacto</li>
+                                    <li>Contraseña segura</li>
+                                    <li>Nombre del edificio</li>
+                                </ul>
+                            </li>
+                            <li>Enviar el formulario para crear la cuenta</li>
+                        </ol>
+                    </div>
+
+                    <div id="verificacion-email" class="bg-white p-6 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-semibold mb-4">Subproceso 1.2: Verificación por Email 📧</h2>
+                        <p class="text-gray-600 mb-4">Para garantizar la seguridad, se requiere verificar el email del administrador:</p>
+                        <ol class="list-decimal pl-6 space-y-2">
+                            <li>Revisar la bandeja de entrada del email registrado</li>
+                            <li>Localizar el email con el código de verificación</li>
+                            <li>Ingresar el código en la página de verificación</li>
+                            <li>Confirmar la verificación para activar la cuenta</li>
+                        </ol>
+                        <div class="bg-blue-50 p-4 rounded-md mt-4">
+                            <p class="text-blue-700">⚠️ El código de verificación expira después de 10 minutos. Si no lo recibe, puede solicitar uno nuevo desde la página de verificación.</p>
+                        </div>
+                    </div>
+
+                    <div id="perfil-completo" class="bg-white p-6 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-semibold mb-4">Subproceso 1.3: Perfil Completo 📝</h2>
+                        <p class="text-gray-600 mb-4">Complete la información del edificio y el administrador en 4 pasos:</p>
+                        <ol class="list-decimal pl-6 space-y-2">
+                            <li>Información básica:
+                                <ul class="list-disc pl-6 mt-2">
+                                    <li>Nombre del edificio</li>
+                                    <li>Dirección completa</li>
+                                </ul>
+                            </li>
+                            <li>Características del edificio:
+                                <ul class="list-disc pl-6 mt-2">
+                                    <li>Número de pisos</li>
+                                    <li>Cantidad de unidades</li>
+                                    <li>Año de construcción</li>
+                                </ul>
+                            </li>
+                            <li>Información de contacto:
+                                <ul class="list-disc pl-6 mt-2">
+                                    <li>Teléfono del edificio</li>
+                                    <li>Email de contacto</li>
+                                    <li>Sitio web (opcional)</li>
+                                    <li>Descripción (opcional)</li>
+                                </ul>
+                            </li>
+                            <li>Datos del administrador:
+                                <ul class="list-disc pl-6 mt-2">
+                                    <li>Nombre completo</li>
+                                    <li>Teléfono de contacto</li>
+                                </ul>
+                            </li>
+                        </ol>
+                    </div>
+
+                    <div id="config-whatsapp" class="bg-white p-6 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-semibold mb-4">Subproceso 1.4: Configuración de WhatsApp 📱</h2>
+                        <p class="text-gray-600 mb-4">Configure WhatsApp para comunicarse con los residentes:</p>
+                        <ol class="list-decimal pl-6 space-y-2">
+                            <li>Acceder a la sección de configuración de WhatsApp</li>
+                            <li>Escanear el código QR con su teléfono:
+                                <ul class="list-disc pl-6 mt-2">
+                                    <li>Abrir WhatsApp en su teléfono</li>
+                                    <li>Ir a Configuración > Dispositivos vinculados</li>
+                                    <li>Escanear el código QR mostrado</li>
+                                </ul>
+                            </li>
+                            <li>Esperar la confirmación de la conexión</li>
+                            <li>Verificar el estado de la conexión</li>
+                        </ol>
+                        <div class="bg-yellow-50 p-4 rounded-md mt-4">
+                            <p class="text-yellow-700">⚠️ El código QR expira después de 40 segundos. Si expira, puede generar uno nuevo haciendo clic en el botón correspondiente.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Comienzo del Proceso 2: Gestión de Espacios -->
+                    <h1 id="espacios" class="text-3xl font-bold mb-8 mt-16">Proceso 2: Gestión de Espacios 🏢</h1>
+                    
+                    <div class="space-y-8">
+                        <div id="espacios-tipos" class="bg-white p-6 rounded-lg shadow-lg">
+                            <h2 class="text-2xl font-semibold mb-4">Subproceso 2.1: Gestión de Tipos de Espacios 🏠</h2>
+                            <p class="text-gray-600 mb-4">Configure los diferentes tipos de espacios disponibles en su edificio:</p>
+                            <ol class="list-decimal pl-6 space-y-2">
+                                <li>Acceda al módulo "Espacios" desde el menú lateral</li>
+                                <li>Haga clic en "Administrar Tipos" en la esquina superior derecha</li>
+                                <li>Para añadir un nuevo tipo:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Haga clic en "Añadir Tipo"</li>
+                                        <li>Complete el nombre del tipo (ej: Departamento, Cochera)</li>
+                                        <li>Opcionalmente, añada una descripción</li>
+                                        <li>Configure si es reservable (para sistema de reservas)</li>
+                                        <li>Configure si es asignable (para propietarios)</li>
+                                        <li>Haga clic en "Guardar"</li>
+                                    </ul>
+                                </li>
+                                <li>Para editar un tipo existente:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Haga clic en el ícono de edición junto al tipo</li>
+                                        <li>Modifique los campos necesarios</li>
+                                        <li>Guarde los cambios</li>
+                                    </ul>
+                                </li>
+                            </ol>
+                            <div class="bg-blue-50 p-4 rounded-md mt-4">
+                                <p class="text-blue-700">⚠️ No podrá eliminar tipos que estén siendo utilizados por espacios existentes.</p>
+                            </div>
+                        </div>
+
+                        <div id="espacios-creacion" class="bg-white p-6 rounded-lg shadow-lg">
+                            <h2 class="text-2xl font-semibold mb-4">Subproceso 2.2: Creación de Espacios ➕</h2>
+                            <p class="text-gray-600 mb-4">Para crear nuevos espacios en su edificio:</p>
+                            <ol class="list-decimal pl-6 space-y-2">
+                                <li>En la pantalla de Espacios, haga clic en "Añadir Espacio"</li>
+                                <li>Complete el formulario con:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Nombre del espacio (ej: "Unidad 101", "Cochera 5")</li>
+                                        <li>Tipo de espacio (seleccione de la lista desplegable)</li>
+                                        <li>Piso donde se encuentra</li>
+                                        <li>Descripción adicional (opcional)</li>
+                                    </ul>
+                                </li>
+                                <li>Haga clic en "Crear" para registrar el nuevo espacio</li>
+                                <li>El espacio aparecerá inmediatamente en la lista</li>
+                            </ol>
+                            <div class="bg-green-50 p-4 rounded-md mt-4">
+                                <p class="text-green-700">💡 Para edificios nuevos o grandes, puede usar la función "Generar Unidades" que permite crear múltiples espacios automáticamente.</p>
+                            </div>
+                        </div>
+
+                        <div id="espacios-edicion" class="bg-white p-6 rounded-lg shadow-lg">
+                            <h2 class="text-2xl font-semibold mb-4">Subproceso 2.3: Edición y Eliminación ✏️</h2>
+                            <p class="text-gray-600 mb-4">Para modificar o eliminar espacios existentes:</p>
+                            <ol class="list-decimal pl-6 space-y-2">
+                                <li>Edición de espacios:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Localice el espacio en la lista</li>
+                                        <li>Haga clic en el ícono de edición (lápiz)</li>
+                                        <li>Actualice la información necesaria</li>
+                                        <li>Haga clic en "Guardar" para aplicar los cambios</li>
+                                    </ul>
+                                </li>
+                                <li>Eliminación de espacios:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Localice el espacio en la lista</li>
+                                        <li>Haga clic en el ícono de eliminación (papelera)</li>
+                                        <li>Confirme la acción en el diálogo que aparecerá</li>
+                                    </ul>
+                                </li>
+                            </ol>
+                            <div class="bg-yellow-50 p-4 rounded-md mt-4">
+                                <p class="text-yellow-700">⚠️ No podrá eliminar espacios que tengan reclamos asociados. Deberá resolver todos los reclamos vinculados antes de poder eliminar un espacio.</p>
+                            </div>
+                        </div>
+
+                        <div id="espacios-propietarios" class="bg-white p-6 rounded-lg shadow-lg">
+                            <h2 class="text-2xl font-semibold mb-4">Subproceso 2.4: Asignación de Propietarios 👤</h2>
+                            <p class="text-gray-600 mb-4">Vincule propietarios a los espacios para gestionar permisos y comunicaciones:</p>
+                            <ol class="list-decimal pl-6 space-y-2">
+                                <li>Haga clic en "Ver detalles" (icono de ojo) junto al espacio</li>
+                                <li>En la sección "Propietarios", haga clic en "Asignar propietario"</li>
+                                <li>Seleccione el propietario de la lista desplegable</li>
+                                <li>Indique si es el propietario principal marcando la casilla</li>
+                                <li>Haga clic en "Asignar" para completar la operación</li>
+                                <li>Para eliminar un propietario:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Haga clic en el ícono de eliminación junto al nombre</li>
+                                        <li>Confirme la acción en el diálogo</li>
+                                    </ul>
+                                </li>
+                            </ol>
+                            <div class="bg-indigo-50 p-4 rounded-md mt-4">
+                                <p class="text-indigo-700">🔔 La asignación de propietarios es esencial para que los usuarios puedan acceder a la información de sus espacios en la aplicación móvil.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Comienzo del Proceso 3: Registro de Propietarios por Invitación -->
+                    <h1 id="invitacion" class="text-3xl font-bold mb-8 mt-16">Proceso 3: Registro de Propietarios por Invitación 👥</h1>
+                    
+                    <div class="space-y-8">
+                        <div id="invitacion-enviar" class="bg-white p-6 rounded-lg shadow-lg">
+                            <h2 class="text-2xl font-semibold mb-4">Subproceso 3.1: Envío de Invitaciones 📲</h2>
+                            <p class="text-gray-600 mb-4">Invite a los propietarios a registrarse en la plataforma mediante un sencillo proceso:</p>
+                            <ol class="list-decimal pl-6 space-y-2">
+                                <li>Acceda a la sección "Gestión de Propietarios" desde el menú lateral</li>
+                                <li>Haga clic en el botón "Invitar Propietario"</li>
+                                <li>Complete el formulario con los datos del propietario:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Nombre y apellido del propietario</li>
+                                        <li>Número de WhatsApp (con formato internacional, ej: +549XXXXXXXX)</li>
+                                        <li>Seleccione la(s) unidad(es) que le pertenecen</li>
+                                        <li>Configure las preferencias del asistente virtual (opcional)</li>
+                                    </ul>
+                                </li>
+                                <li>Haga clic en "Enviar Invitación"</li>
+                                <li>El sistema enviará automáticamente un mensaje de WhatsApp al propietario con:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Un enlace personalizado para el registro</li>
+                                        <li>Un código de verificación de 6 dígitos</li>
+                                        <li>Instrucciones para completar el registro</li>
+                                    </ul>
+                                </li>
+                            </ol>
+                            <div class="bg-blue-50 p-4 rounded-md mt-4">
+                                <p class="text-blue-700">⚠️ El número de WhatsApp debe estar activo y debe incluir el código de país con el formato internacional correcto.</p>
+                            </div>
+                        </div>
+
+                        <div id="invitacion-seguimiento" class="bg-white p-6 rounded-lg shadow-lg">
+                            <h2 class="text-2xl font-semibold mb-4">Subproceso 3.2: Seguimiento de Invitaciones 📊</h2>
+                            <p class="text-gray-600 mb-4">Monitoree el estado de las invitaciones enviadas:</p>
+                            <ol class="list-decimal pl-6 space-y-2">
+                                <li>En la sección "Gestión de Propietarios", encontrará dos paneles:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>"Invitaciones Pendientes": muestra todas las invitaciones que aún no han sido completadas</li>
+                                        <li>"Propietarios Registrados": muestra todos los propietarios que ya han finalizado su registro</li>
+                                    </ul>
+                                </li>
+                                <li>Para cada invitación pendiente, puede ver:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Nombre del propietario invitado</li>
+                                        <li>Número de WhatsApp</li>
+                                        <li>Unidad(es) asignada(s)</li>
+                                        <li>Fecha de envío de la invitación</li>
+                                        <li>Estado actual (Pendiente)</li>
+                                    </ul>
+                                </li>
+                                <li>Si una invitación no ha sido utilizada, puede:
+                                    <ul class="list-disc pl-6 mt-2">
+                                        <li>Reenviar la invitación haciendo clic en el botón "Reenviar"</li>
+                                        <li>Verificar que el número de WhatsApp sea correcto</li>
+                                    </ul>
+                                </li>
+                            </ol>
+                            <div class="bg-yellow-50 p-4 rounded-md mt-4">
+                                <p class="text-yellow-700">⚠️ Las invitaciones tienen un período de validez de 48 horas. Pasado este tiempo, deberá enviar una nueva invitación.</p>
+                            </div>
+                        </div>
+
+                        <div id="invitacion-completar" class="bg-white p-6 rounded-lg shadow-lg">
+                            <h2 class="text-2xl font-semibold mb-4">Subproceso 3.3: Registro del Propietario 👤</h2>
+                            <p class="text-gray-600 mb-4">Proceso que realiza el propietario para completar su registro:</p>
+                            <ol class="list-decimal pl-6 space-y-2">
+                                <li>El propietario recibe un mensaje en WhatsApp con:</li>
+                                <ul class="list-disc pl-6 mt-2">
+                                    <li>Un enlace personalizado para registrarse</li>
+                                    <li>Un código de verificación de 6 dígitos</li>
+                                </ul>
+                                <li>Al hacer clic en el enlace, accede a una página web donde debe:</li>
+                                <ul class="list-disc pl-6 mt-2">
+                                    <li>Ingresar el código de verificación recibido por WhatsApp</li>
+                                    <li>Completar un formulario con:
+                                        <ul class="list-circle pl-6 mt-1">
+                                            <li>DNI (documento de identidad)</li>
+                                            <li>Correo electrónico de recuperación</li>
+                                            <li>Contraseña segura</li>
+                                        </ul>
+                                    </li>
+                                    <li>Hacer clic en "Completar Registro"</li>
+                                </ul>
+                                <li>Una vez completado el registro:</li>
+                                <ul class="list-disc pl-6 mt-2">
+                                    <li>La cuenta del propietario queda activa inmediatamente</li>
+                                    <li>Se vincula automáticamente a las unidades asignadas</li>
+                                    <li>Puede acceder a la plataforma con su DNI y contraseña</li>
+                                    <li>Aparece en la sección "Propietarios Registrados" del panel de administración</li>
+                                </ul>
+                            </ol>
+                            <div class="bg-green-50 p-4 rounded-md mt-4">
+                                <p class="text-green-700">💡 El propietario tendrá acceso inmediato a toda la información de sus unidades, incluyendo expensas, reclamos y documentos, según los permisos configurados.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>    
+                  
+              
+            </div>
+
+        </div>
+    </div>
+
+<div class="text-center mt-12">
+  <a href="index.html" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow">
+    ← Volver al índice de documentación
+  </a>
+</div>
+</body>
+</html>
