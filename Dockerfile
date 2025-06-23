@@ -24,6 +24,6 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copiar los archivos de build desde la etapa anterior
 COPY --from=build /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 8084
 
 CMD ["nginx", "-g", "daemon off;"]
