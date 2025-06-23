@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { InvitationForm } from '../components/Owners/InvitationForm';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
 import { BuildingOwnership, GlobalOwner, Invitation, Unit } from '../types';
 
 interface OwnerWithUnits extends GlobalOwner {
@@ -26,13 +27,23 @@ export const OwnersManagement = () => {
   React.useEffect(() => {
     const fetchData = async () => {
       try {
-        // TODO: Implementar llamadas a la API
-        const [ownersData, unitsData, invitationsData] = await Promise.all([
-          fetch(`/owners/buildings/${buildingId}`).then(res => res.json()),
-          fetch(`/buildings/${buildingId}/units?available=true`).then(res => res.json()),
-          fetch(`/owners/buildings/${buildingId}/invitations`).then(res => res.json())
+        setIsLoading(true);
+        console.log('Cargando propietarios para el edificio:', buildingId);
+
+        // Usar api.get en lugar de fetch para incluir automáticamente el token y la URL base
+        const [ownersResponse, unitsResponse, invitationsResponse] = await Promise.all([
+          api.get<OwnerWithUnits[]>(`/owners/buildings/${buildingId}`),
+          api.get<Unit[]>(`/buildings/${buildingId}/units?available=true`),
+          api.get<Invitation[]>(`/owners/buildings/${buildingId}/invitations`)
         ]);
 
+        console.log('Datos de propietarios recibidos:', ownersResponse.data);
+
+        // Asegurarnos de que los datos son arrays
+        const ownersData = Array.isArray(ownersResponse.data) ? ownersResponse.data : [];
+        const unitsData = Array.isArray(unitsResponse.data) ? unitsResponse.data : [];
+        const invitationsData = Array.isArray(invitationsResponse.data) ? invitationsResponse.data : [];
+        
         setOwners(ownersData);
         setAvailableUnits(unitsData);
         setPendingInvitations(invitationsData);
@@ -48,7 +59,9 @@ export const OwnersManagement = () => {
       }
     };
 
-    fetchData();
+    if (buildingId) {
+      fetchData();
+    }
   }, [buildingId]);
 
   const handleInviteOwner = async (data: Omit<Invitation, 'id' | 'buildingId' | 'status' | 'token' | 'expiresAt' | 'createdAt'>) => {
