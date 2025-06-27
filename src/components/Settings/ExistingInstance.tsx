@@ -4,11 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useN8nWebhook } from '@/hooks/useN8nWebhook';
-
+import { api } from '@/lib/api'; // Importar el cliente API centralizado
 
 import { WhatsAppInstance, WhatsAppInstanceResponse } from '@/types/whatsapp';
-
-const WHATSAPP_API = `${import.meta.env.VITE_API_BASE_URL}/buildings/whatsapp`;
 
 interface ExistingInstanceProps {
   buildingId: string;
@@ -22,27 +20,37 @@ export function ExistingInstance({ buildingId, instance: initialInstance, onRefr
   const [isGeneratingQr, setIsGeneratingQr] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Query para obtener el estado actualizado de la instancia
-  const { data: instance } = useQuery<WhatsAppInstanceResponse, Error, WhatsAppInstance>({
-    queryKey: ['whatsapp-instance', buildingId],
+  // Estado local para mantener la instancia actualizada
+  const [instance, setInstance] = useState<WhatsAppInstance>(initialInstance);
+  
+  // Query para obtener el estado actualizado de la instancia usando el endpoint de status
+  const { data: statusData, refetch: refetchStatus } = useQuery<{ success: boolean, data: WhatsAppInstance, message: string }, Error>({
+    queryKey: ['whatsapp-status-instance', buildingId],
     queryFn: async () => {
-      const response = await fetch(`${WHATSAPP_API}/${buildingId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al obtener la información de la instancia');
-      }
-
-      return response.json();
+      // Usar el endpoint de status que proporciona datos actualizados
+      console.log(`[ExistingInstance] Consultando estado para ${buildingId}...`);
+      const response = await api.get<{ success: boolean, data: WhatsAppInstance, message: string }>(
+        `/buildings/whatsapp/status/${buildingId}`
+      );
+      return response.data;
     },
-    select: (data) => data.data,
-    initialData: { data: initialInstance, success: true, message: 'Instancia cargada' },
-    refetchInterval: initialInstance?.status === 'CONNECTED' ? 120000 : 10000 // 2 min si está conectado, 10 seg si no
+    refetchInterval: 5000, // Consultar cada 5 segundos
+    enabled: Boolean(buildingId)
   });
+  
+  // Actualizar el estado local cuando cambian los datos de status
+  useEffect(() => {
+    if (statusData?.data) {
+      console.log('[ExistingInstance] Estado actualizado:', statusData.data.status);
+      setInstance(statusData.data);
+    }
+  }, [statusData?.data]);
+  
+  // Actualizar también cuando cambia initialInstance desde las props
+  useEffect(() => {
+    setInstance(initialInstance);
+  }, [initialInstance?.id, initialInstance?.status]);
+  
   
   // Obtener los webhooks necesarios
   const { data: connectWebhook } = useN8nWebhook('whatsapp_connect');
