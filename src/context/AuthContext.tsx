@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '@/types';
+import { api } from '@/lib/api';
 
 interface AuthContextType {
   currentUser: ExtendedUser | null;
@@ -91,6 +92,11 @@ interface RegisterResponse {
   };
   trialEndsAt: string;
   requiresVerification: boolean;
+  success?: boolean;
+  error?: {
+    message: string;
+  };
+  message?: string;
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -264,102 +270,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Modificamos el tipo de retorno para incluir información sobre el error si ocurre
-  // Implementamos un registro silencioso que no aparezca como error en la consola
   const registerAdmin = async (adminData: AdminRegistrationData): Promise<string | { error: string }> => {
     try {
       setLoading(true);
       
-      const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/auth/register`;
-      console.log('API URL:', apiUrl);
       console.log('Admin data being sent:', adminData);
       
-      // Usamos una estrategia diferente para evitar que el 400 aparezca como error en la consola
-      // Haremos un fetch que siempre resuelve (nunca rechaza la promesa)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos de timeout
-      
-      let responseData;
       try {
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            firstName: adminData.firstName,
-            lastName: adminData.lastName,
-            email: adminData.email,
-            password: adminData.password,
-            building: adminData.building
-          }),
-          signal: controller.signal
+        const response = await api.post<RegisterResponse>('/auth/register', {
+          firstName: adminData.firstName,
+          lastName: adminData.lastName,
+          email: adminData.email,
+          password: adminData.password,
+          building: adminData.building
         });
-        
-        clearTimeout(timeoutId);
-        
-        responseData = await response.json();
-        console.log('Response status:', response.status);
-        console.log('Response data:', responseData);
 
-        // Verificar si la respuesta contiene un error (nuevo formato)
-        if (responseData.success === false && responseData.error) {
-          return { error: responseData.error.message || 'Error al registrar usuario' };
+        if (response.data.success === false && response.data.error) {
+          return { error: response.data.error.message || 'Error al registrar usuario' };
         }
         
-        // Si la respuesta no es exitosa por cualquier otra razón
-        if (!response.ok) {
-          return { error: responseData.message || 'Error al registrar usuario' };
+        const data = response.data;
+        
+        const emailVerification = data.user.emailVerifications?.[0] || null;
+        const emailVerified = emailVerification?.isVerified || false;
+
+        const extendedUser: ExtendedUser = {
+          ...data.user,
+          token: data.access_token,
+          buildingName: data.building.name,
+          buildingData: {
+            address: '',
+            floors: '',
+            totalUnits: '',
+            contact: {
+              phone: '',
+              whatsapp: '',
+            },
+            adminPhone: ''
+          },
+          isProfileComplete: false, 
+          role: 'BUILDING_ADMIN' as const, 
+          emailVerified,
+          emailVerification
+        };
+        
+        const userToSave = convertDatesToObjects(extendedUser);
+        setCurrentUser(userToSave);
+        
+        localStorage.setItem('user', JSON.stringify(userToSave));
+        
+        localStorage.setItem('token', data.access_token);
+        
+        window.location.href = '/verify-email';
+        return '/verify-email';
+        
+      } catch (error: any) {
+        console.log('Error al registrar:', error);
+        
+        if (error.response && error.response.data) {
+          const errorMessage = error.response.data.message || error.response.data.error?.message || 'Error al registrar usuario';
+          return { error: errorMessage };
         }
-      } catch (fetchError: any) {
-        // Si hubo un error de red o timeout, lo manejamos aquí
-        if (fetchError.name === 'AbortError') {
+        
+        if (error.code === 'ECONNABORTED') {
           return { error: 'La solicitud tomó demasiado tiempo en completarse. Por favor, inténtelo de nuevo.' };
         }
+        
         return { error: 'Error de conexión. Por favor, verifique su conexión a internet e inténtelo de nuevo.' };
       }
-
-      if (!responseData) {
-        return { error: 'No se recibió respuesta del servidor' };
-      }
-      
-      const data: RegisterResponse = responseData;
-      
-      // Guardar el usuario actual con el nombre del edificio
-      // Obtener información de verificación de email
-      const emailVerification = data.user.emailVerifications?.[0] || null;
-      const emailVerified = emailVerification?.isVerified || false;
-
-      const extendedUser: ExtendedUser = {
-        ...data.user,
-        token: data.access_token,
-        buildingName: data.building.name,
-        buildingData: {
-          address: '',
-          floors: '',
-          totalUnits: '',
-          contact: {
-            phone: '',
-            whatsapp: '',
-          },
-          adminPhone: ''
-        },
-        isProfileComplete: false, // Siempre false para forzar el flujo de completar perfil
-        role: 'BUILDING_ADMIN' as const, // Asegurarnos de que el rol sea BUILDING_ADMIN
-        emailVerified,
-        emailVerification
-      };
-      // Asegurarnos de que las fechas sean objetos Date antes de guardar
-    const userToSave = convertDatesToObjects(extendedUser);
-    setCurrentUser(userToSave);
-    
-    // Guardar el usuario en localStorage
-    localStorage.setItem('user', JSON.stringify(userToSave));
-    
-    // Guardar el token JWT en localStorage (esto es crucial para getAuthHeaders)
-    localStorage.setItem('token', data.access_token);
-    
-    window.location.href = '/verify-email';
-    return '/verify-email';
     } catch (error) {
       console.error('Error al registrar administrador:', error);
       throw error;

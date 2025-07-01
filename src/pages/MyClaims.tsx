@@ -170,18 +170,34 @@ const MyClaimsPage = () => {
         return;
       }
       
-      // Usar el nuevo endpoint implementado para obtener solo los reclamos creados por el propietario
-      const response = await api.get<Claim[]>(`/buildings/${buildingId}/claims/my-claims`, {
-        timeout: 5000 // Establecer un timeout más corto para evitar esperas largas
-      });
+      console.log(`Obteniendo reclamos del edificio ${buildingId}...`);
       
-      console.log(`Obteniendo reclamos del edificio ${buildingId} usando /buildings/${buildingId}/claims/my-claims`);
-      
-      console.log('Respuesta de la API:', response.data);
-      
-      const myClaims = Array.isArray(response.data) ? response.data : [];
-      setClaims(myClaims);
-      setFilteredClaims(myClaims);
+      // Intentamos primero con el endpoint específico para 'my-claims'
+      try {
+        const response = await api.get<Claim[]>(`/buildings/${buildingId}/claims/my-claims`);
+        console.log('Respuesta de la API (my-claims):', response.data);
+        
+        const myClaims = Array.isArray(response.data) ? response.data : [];
+        setClaims(myClaims);
+        setFilteredClaims(myClaims);
+      } catch (myClaimsError) {
+        console.warn('Error al usar endpoint my-claims, intentando alternativa:', myClaimsError);
+        
+        // Si falla, intentamos con el endpoint general de claims, filtrando en el cliente
+        const response = await api.get<Claim[]>(`/buildings/${buildingId}/claims`);
+        console.log('Respuesta de la API (claims generales):', response.data);
+        
+        // Filtramos solo los reclamos creados por el usuario actual
+        const allClaims = Array.isArray(response.data) ? response.data : [];
+        const userClaims = allClaims.filter(claim => 
+          claim.creatorId === currentUser?.id || 
+          (claim.creator && claim.creator.id === currentUser?.id)
+        );
+        
+        console.log(`Reclamos filtrados para usuario ${currentUser?.id}:`, userClaims);
+        setClaims(userClaims);
+        setFilteredClaims(userClaims);
+      }
     } catch (error: any) {
       console.error('Error al obtener mis reclamos:', error?.response?.status || error?.message || error);
       toast.error('No se pudieron cargar tus reclamos. Por favor intenta más tarde.');
@@ -788,11 +804,7 @@ const MyClaimsPage = () => {
               )}
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedClaim(null)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
+          {/* No necesitamos footer con botón de cerrar, mantenemos consistencia con la vista de Claims */}
         </DialogContent>
       </Dialog>
     </div>
