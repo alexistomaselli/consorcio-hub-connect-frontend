@@ -4,6 +4,7 @@ import { WhatsAppConfig } from '@/components/Settings/WhatsAppConfig';
 import { Building } from '@/types';
 import { WhatsAppInstance } from '@/types/whatsapp';
 import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 
 
 
@@ -53,14 +54,13 @@ export default function BuildingSettings() {
   const { data: building, isLoading: buildingLoading } = useQuery<Building>({
     queryKey: ['building', buildingId],
     queryFn: async () => {
-      const response = await fetch(`/buildings/${buildingId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (!response.ok) throw new Error('Error al cargar el edificio');
-      return response.json();
+      try {
+        const response = await api.get<Building>(`/buildings/${buildingId}`);
+        return response.data;
+      } catch (error) {
+        console.error('Error al cargar el edificio:', error);
+        throw new Error('Error al cargar el edificio');
+      }
     },
     enabled: !!buildingId,
   });
@@ -70,31 +70,21 @@ export default function BuildingSettings() {
     queryFn: async () => {
       console.log('Fetching WhatsApp instance:', buildingId);
       try {
-        const response = await fetch(`/buildings/whatsapp/${buildingId}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
+        const response = await api.get<{ success: boolean; data: WhatsAppInstance | null; message: string }>(
+          `/buildings/whatsapp/${buildingId}`
+        );
+        
+        console.log('API Response:', {
+          status: response.status,
+          statusText: response.statusText
         });
-      console.log('API Response:', {
-        status: response.status,
-        ok: response.ok,
-        statusText: response.statusText
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', errorText);
-        throw new Error(`Error al cargar la instancia de WhatsApp: ${response.status} ${response.statusText}`);
+        
+        console.log('WhatsApp instance data:', response.data);
+        return response.data;
+      } catch (error: any) {
+        console.error('API request error:', error);
+        throw new Error(`Error al cargar la instancia de WhatsApp: ${error.message}`);
       }
-
-      const data = await response.json();
-      console.log('WhatsApp instance data:', data);
-      return data;
-    } catch (error) {
-      console.error('Fetch error:', error);
-      throw error;
-    }
     },
     enabled: !!buildingId,
   });
@@ -114,10 +104,17 @@ export default function BuildingSettings() {
   if (error) {
     console.error('Error loading building:', error);
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center space-y-4">
-          <p className="text-red-600 font-medium">Error al cargar los datos del edificio</p>
-          <p className="text-sm text-gray-500">{error instanceof Error ? error.message : 'Error desconocido'}</p>
+      <div className="container mx-auto py-6 space-y-6">
+        <h1 className="text-2xl font-bold">Configuración del Consorcioooo</h1>
+        
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Configuración de WhatsApp */}
+          <WhatsAppConfig
+            buildingId={buildingId!}
+            whatsapp={whatsappInstance?.data}
+          />
+
+          {/* Aquí irán otros componentes de configuración */}
         </div>
       </div>
     );

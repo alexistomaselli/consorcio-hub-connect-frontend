@@ -1,0 +1,23 @@
+services:
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: consorcio_frontend_dev
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - consorcio-network
+    environment:
+      - NODE_ENV=development
+      - DOCKER_ENV=true
+      - VITE_API_URL=http://host.docker.internal:3000
+
+networks:
+  consorcio-network:
+    external: true
+    name: consorcio-hub-backend-new_consorcio-network

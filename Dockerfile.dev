@@ -1,0 +1,15 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# No copies los archivos en la imagen, se montarán como volumen
+COPY package*.json ./
+
+# Instalar dependencias
+RUN npm install
+
+# Exponer el puerto para desarrollo
+EXPOSE 8084
+
+# Comando para iniciar el servidor de desarrollo
+CMD ["npm", "run", "dev"]

@@ -392,7 +392,10 @@ const Claims = () => {
                   Complete el formulario para crear un nuevo reclamo.
                 </DialogDescription>
               </DialogHeader>
-              <CreateClaimForm onSuccess={() => setIsOpen(false)} />
+              <CreateClaimForm onSuccess={() => {
+                setIsOpen(false);
+                fetchClaims(); // Refrescar la lista de reclamos después de crear uno nuevo
+              }} />
             </DialogContent>
           </Dialog>
         )}
@@ -742,126 +745,177 @@ const Claims = () => {
 
       {/* Dialog para mostrar detalles del reclamo */}
       <Dialog open={!!selectedClaim} onOpenChange={(open) => !open && setSelectedClaim(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl">{selectedClaim?.title}</DialogTitle>
-            <DialogDescription>Detalles del reclamo</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto p-0">
+          <div className="sticky top-0 z-10 bg-white pt-4 px-6 pb-2 border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <DialogTitle className="text-xl font-bold">{selectedClaim?.title}</DialogTitle>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setSelectedClaim(null)}
+                className="rounded-full h-8 w-8 mr-2"
+              >
+                <span className="sr-only">Cerrar</span>
+                ×
+              </Button>
+            </div>
+          </div>
           
           {selectedClaim && (
-            <div className="space-y-5 py-2">
-              <div>
-                <h3 className="text-md font-semibold mb-1">Descripción</h3>
-                <p className="text-sm">{selectedClaim.description}</p>
+            <div className="p-6 space-y-6">
+              <div className="bg-gray-50 p-4 rounded-xl">
+                <h3 className="text-sm font-medium text-gray-500 mb-2">Descripción</h3>
+                <p className="text-base">{selectedClaim.description}</p>
               </div>
               
-              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                <div>
-                  <h3 className="text-md font-semibold mb-1">Estado</h3>
-                  <div>{getStatusBadge(selectedClaim.status)}</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
+                {/* Estado */}
+                <div className="bg-white border rounded-lg p-4 shadow-sm">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Estado</h3>
+                  <div className="flex items-center">
+                    {getStatusBadge(selectedClaim.status)}
+                  </div>
                 </div>
                 
-                <div>
-                  <h3 className="text-md font-semibold mb-1">Fecha de creación</h3>
-                  <p className="text-sm">{formatDate(selectedClaim.createdAt)}</p>
+                {/* Fecha de creación */}
+                <div className="bg-white border rounded-lg p-4 shadow-sm">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Fecha de creación</h3>
+                  <p className="text-base font-medium">{formatDate(selectedClaim.createdAt)}</p>
                 </div>
                 
-                <div>
-                  <h3 className="text-md font-semibold mb-1">Espacio/Unidad</h3>
-                  <div className="text-sm">
+                {/* Espacio/Unidad */}
+                <div className="bg-white border rounded-lg p-4 shadow-sm">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Espacio/Unidad</h3>
+                  <div>
                     {(() => {
                       // Contenido principal (nombre del espacio)
                       let spaceName = '';
                       // Tipo de espacio (categoría)
                       let spaceType = '';
-                      // Clase para el estilo del contenido principal
-                      let mainClass = 'font-medium';
-                      // Clase para el estilo del tipo de espacio
-                      let typeClass = 'text-xs text-gray-500 mt-1';
+                      // Icono para el tipo de espacio
+                      let icon = '';
+                      // Color para el badge del tipo
+                      let badgeColor = '';
                       
                       if (selectedClaim.space?.name) {
                         spaceName = selectedClaim.space.name;
                         spaceType = selectedClaim.space.spaceType?.name || 'Espacio';
-                        mainClass += ' text-blue-700';
+                        badgeColor = 'bg-blue-100 text-blue-800 border-blue-200';
+                        icon = '🏢';
                       } else if (selectedClaim.unit) {
                         spaceName = `${selectedClaim.unit.floor}-${selectedClaim.unit.number}`;
                         spaceType = 'Unidad';
-                        mainClass += ' text-orange-700';
+                        badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
+                        icon = '🚪';
                       } else if (selectedClaim.location === 'COMMON_AREA') {
                         spaceName = selectedClaim.locationDetail || 'Área común';
                         spaceType = 'Área común';
-                        mainClass += ' text-green-700';
+                        badgeColor = 'bg-green-100 text-green-800 border-green-200';
+                        icon = '🏛️';
                       } else if (selectedClaim.location === 'BUILDING') {
                         spaceName = selectedClaim.locationDetail || 'Todo el edificio';
                         spaceType = 'Edificio';
-                        mainClass += ' text-purple-700';
+                        badgeColor = 'bg-violet-100 text-violet-800 border-violet-200';
+                        icon = '🏙️';
                       } else {
                         spaceName = selectedClaim.locationDetail || '-';
                         spaceType = 'Otro';
+                        badgeColor = 'bg-gray-100 text-gray-800 border-gray-200';
+                        icon = '📍';
                       }
                       
                       return (
                         <div className="flex flex-col">
-                          <span className={mainClass}>{spaceName}</span>
-                          <span className={typeClass}>{spaceType}</span>
+                          <div className="text-base font-medium mb-1">
+                            {icon} {spaceName}
+                          </div>
+                          <Badge variant="outline" className={badgeColor}>
+                            {spaceType}
+                          </Badge>
                         </div>
                       );
                     })()}
                   </div>
                 </div>
                 
-                <div>
-                  <h3 className="text-md font-semibold mb-1">Creador</h3>
+                {/* Creador */}
+                <div className="bg-white border rounded-lg p-4 shadow-sm">
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Creador</h3>
                   {selectedClaim.creator ? (
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                      {selectedClaim.creator.firstName} {selectedClaim.creator.lastName}
-                    </Badge>
-                  ) : <p className="text-sm">-</p>}
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">
+                        {selectedClaim.creator.firstName.charAt(0)}{selectedClaim.creator.lastName.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium">
+                          {selectedClaim.creator.firstName} {selectedClaim.creator.lastName}
+                        </div>
+                        {selectedClaim.creator.email && (
+                          <div className="text-xs text-gray-500">
+                            {selectedClaim.creator.email}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : <p className="text-base">-</p>}
                 </div>
               </div>
               
+              {/* Comentarios */}
               {selectedClaim.comments && selectedClaim.comments.length > 0 && (
-                <div>
-                  <h3 className="text-md font-semibold mb-2">Comentarios ({selectedClaim.comments.length})</h3>
-                  <div className="space-y-2 max-h-40 overflow-auto">
+                <div className="border rounded-lg p-4 shadow-sm">
+                  <h3 className="text-base font-semibold mb-4">Comentarios ({selectedClaim.comments.length})</h3>
+                  <div className="space-y-3 max-h-60 overflow-auto pr-2">
                     {selectedClaim.comments.map((comment) => (
-                      <div key={comment.id} className="bg-gray-50 p-2 rounded-md">
-                        <p className="text-sm">{comment.content}</p>
-                        <p className="text-xs text-gray-500">{formatDate(comment.createdAt)}</p>
+                      <div key={comment.id} className="bg-gray-50 p-3 rounded-lg">
+                        <p className="text-sm mb-2">{comment.content}</p>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>{formatDate(comment.createdAt)}</span>
+                          {/* Mostramos solo la fecha del comentario ya que el modelo ClaimComment no tiene propiedad user */}
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
               
+              {/* Archivos adjuntos */}
               {selectedClaim.attachments && selectedClaim.attachments.length > 0 && (
-                <div>
-                  <h3 className="text-md font-semibold mb-2">Archivos adjuntos ({selectedClaim.attachments.length})</h3>
-                  <div className="grid grid-cols-2 gap-2">
+                <div className="border rounded-lg p-4 shadow-sm">
+                  <h3 className="text-base font-semibold mb-4">Archivos adjuntos ({selectedClaim.attachments.length})</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {selectedClaim.attachments.map((attachment) => (
-                      <div key={attachment.id} className="border rounded-md p-2">
-                        <p className="text-sm truncate">{attachment.filename}</p>
+                      <div key={attachment.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xl">📎</span>
+                          <p className="text-sm font-medium truncate">{attachment.filename}</p>
+                        </div>
                         <a 
                           href={attachment.url} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline"
+                          className="text-xs text-primary hover:underline inline-flex items-center gap-1"
                         >
                           Ver archivo
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                          </svg>
                         </a>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+              
+              {/* No necesitamos botones adicionales en la parte inferior, ya tenemos el botón X arriba */}
             </div>
           )}
           
-          <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setSelectedClaim(null)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
+          {/* No necesitamos el footer con botón de cerrar, ya tenemos el botón X arriba */}
         </DialogContent>
       </Dialog>
 

@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8081/api}
+    container_name: consorcio_frontend
+    restart: always
+    ports:
+      - "8084:8084"
+    networks:
+      - consorcio-network
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+    # Si necesita acceder al backend, asegúrese de que estén en la misma red
+
+networks:
+  consorcio-network:
+    external: true
+    name: consorcio-hub-backend-new_consorcio-network
