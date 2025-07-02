@@ -18,22 +18,12 @@ RUN npm run build
 # Etapa de producción con Nginx
 FROM nginx:alpine
 
-# Instalar dependencias adicionales si es necesario
-RUN apk add --no-cache bash
-
-# Copiar la plantilla de configuración de nginx
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+# Copiar la configuración de nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copiar los archivos de build desde la etapa anterior
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Establecer variable de entorno para desarrollo local por defecto
-ENV BACKEND_HOST=http://backend:3000
-
 EXPOSE 8084
 
-# Script de inicio para reemplazar variables en el template
-COPY docker-entrypoint.sh /
-RUN chmod +x /docker-entrypoint.sh
-
-CMD ["/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]
