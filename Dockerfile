@@ -28,7 +28,7 @@ COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Establecer variable de entorno para desarrollo local por defecto
-ENV BACKEND_URL=http://backend:3000
+ENV BACKEND_HOST=http://backend:3000
 
 EXPOSE 8084
 
