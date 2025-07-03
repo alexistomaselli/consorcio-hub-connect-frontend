@@ -114,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  const handleRedirect = (user: ExtendedUser): string => {
+  const handleRedirect = async (user: ExtendedUser): Promise<string> => {
     if (!user) {
       return '/login';
     }
@@ -132,7 +132,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return '/my-claims';
     }
     if (user.role === 'BUILDING_ADMIN' && user.buildingId) {
-      return '/settings/building';
+      try {
+        // Verificar si existe una instancia de WhatsApp para este edificio
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/buildings/whatsapp/exists/${user.buildingId}`, {
+          headers: {
+            'Authorization': `Bearer ${user.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          
+          // Si existe instancia de WhatsApp, redirigir al dashboard
+          if (result.success && result.data && result.data.exists) {
+            return '/dashboard';
+          }
+        }
+        
+        // Si no hay instancia o hubo un error, seguir con el comportamiento actual
+        return '/settings/building';
+      } catch (error) {
+        console.error('Error al verificar instancia de WhatsApp:', error);
+        return '/settings/building';
+      }
     }
     return '/dashboard';
   };
@@ -230,7 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (extendedUser.role === 'BUILDING_ADMIN' && extendedUser.buildingId) {
         try {
           const whatsappResponse = await fetch(
-            `${import.meta.env.VITE_API_BASE_URL}/buildings/whatsapp/${extendedUser.buildingId}`,
+            `${import.meta.env.VITE_API_BASE_URL}/buildings/whatsapp/exists/${extendedUser.buildingId}`,
             {
               headers: {
                 'Authorization': `Bearer ${data.access_token}`,
@@ -242,10 +265,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const whatsappData = await whatsappResponse.json();
           
           // Si no hay instancia de WhatsApp o la respuesta no es exitosa
-          if (!whatsappResponse.ok || !whatsappData.exists) {
+          if (!whatsappResponse.ok || !whatsappData.success || !whatsappData.data.exists) {
+            console.log('No existe instancia de WhatsApp, redirigiendo a configuración');
             window.location.href = '/settings/building';
             return '/settings/building';
           }
+          
+          console.log('Existe instancia de WhatsApp, redirigiendo al dashboard');
         } catch (error) {
           console.error('Error al verificar instancia de WhatsApp:', error);
           window.location.href = '/settings/building';
