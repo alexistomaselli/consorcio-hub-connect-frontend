@@ -10,9 +10,8 @@ RUN npm ci
 # Copiar archivos fuente
 COPY . .
 
-# Variables para el build de producción
-ENV VITE_API_URL=https://consorcio-hub-consorcio-hub-backend-dev.krpwqr.easypanel.host/
-ENV VITE_API_BASE_URL=https://consorcio-hub-consorcio-hub-backend-dev.krpwqr.easypanel.host/
+# Las variables VITE_API_URL y VITE_API_BASE_URL deben configurarse en EasyPanel
+# Así se pueden cambiar sin necesidad de reconstruir la imagen
 
 # Construir la aplicación
 RUN npm run build
