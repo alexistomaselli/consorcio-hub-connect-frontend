@@ -18,12 +18,23 @@ RUN npm run build
 # Etapa de producción con Nginx
 FROM nginx:alpine
 
-# Copiar la configuración de nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copiar ambas configuraciones
+COPY nginx.conf /etc/nginx/nginx.conf.local
+COPY nginx.conf.server /etc/nginx/nginx.conf.server
+
+# Argumento para decidir qué configuración usar, por defecto "local"
+ARG DEPLOY_ENV=local
+
+# Copiar la configuración correcta según el entorno
+RUN if [ "$DEPLOY_ENV" = "server" ]; then \
+        cp /etc/nginx/nginx.conf.server /etc/nginx/conf.d/default.conf; \
+    else \
+        cp /etc/nginx/nginx.conf.local /etc/nginx/conf.d/default.conf; \
+    fi
 
 # Copiar los archivos de build desde la etapa anterior
 COPY --from=build /app/dist /usr/share/nginx/html
 
-EXPOSE 8084
+EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
