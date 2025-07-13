@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { ClaimsProvider } from "@/context/ClaimsContext";
+import { BuildingProvider } from "@/context/BuildingContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ProfileRequiredRoute from "@/components/ProfileRequiredRoute";
 import EmailVerificationGuard from "@/guards/EmailVerificationGuard";
@@ -31,6 +32,7 @@ import BuildingSettings from "./pages/Settings/Building";
 import Services from "./pages/Services";
 import Spaces from "./pages/Spaces";
 import OwnerUnit from "./pages/OwnerUnit";
+import Regulations from "./pages/Regulations";
 import NotFound from "./pages/NotFound";
 import Unauthorized from "./pages/Unauthorized";
 
@@ -39,7 +41,8 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <ClaimsProvider>
+      <BuildingProvider>
+        <ClaimsProvider>
         <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -124,6 +127,7 @@ const App = () => (
                     <Route path="owners" element={<Owners />} />
                     <Route path="buildings/:buildingId/owners" element={<OwnersManagement />} />
                     <Route path="spaces" element={<Spaces />} />
+                    <Route path="regulations" element={<Regulations />} />
                     {/* Ruta solo para SUPER_ADMIN */}
                     <Route path="services" element={<Services />} />
                   </Route>
@@ -133,7 +137,8 @@ const App = () => (
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
-      </ClaimsProvider>
+        </ClaimsProvider>
+      </BuildingProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

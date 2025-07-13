@@ -36,7 +36,7 @@ const Header = () => {
                   Dashboard
                 </Link>
               )}
-              <Link to="/claims" className="hover:text-consorcio-blue transition-colors">
+              <Link to="/dashboard" className="hover:text-consorcio-blue transition-colors">
                 Panel
               </Link>
             </div>
@@ -61,6 +61,9 @@ const Header = () => {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <Link to="/profile" className="w-full">Mi Perfil</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Link to="/dashboard" className="w-full">Panel</Link>
                 </DropdownMenuItem>
                 {currentUser?.role === 'admin' && (
                   <DropdownMenuItem>

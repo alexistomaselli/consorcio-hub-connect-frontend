@@ -1,6 +1,6 @@
 import { Sidebar } from "./Sidebar";
 import { DashboardHeader } from "./DashboardHeader";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -10,7 +10,32 @@ interface Props {
 export function Layout({
   children,
 }: Props) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // Estado del sidebar, por defecto cerrado
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Función para colapsar el sidebar en dispositivos móviles
+  const collapseSidebarOnMobile = () => {
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  // Detectar si es mobile o desktop para establecer el estado inicial
+  useEffect(() => {
+    const handleResize = () => {
+      // Si es desktop (>= 768px), abrir el sidebar, si es mobile cerrarlo
+      setIsSidebarOpen(window.innerWidth >= 768);
+    };
+    
+    // Establecer el estado inicial
+    handleResize();
+    
+    // Agregar listener para cambios de tamaño
+    window.addEventListener('resize', handleResize);
+    
+    // Limpieza
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <div className="flex h-screen bg-background">
@@ -20,7 +45,12 @@ export function Layout({
           isSidebarOpen ? "w-72" : "w-0 overflow-hidden"
         )}
       >
-        <Sidebar />
+        <Sidebar onNavigate={() => {
+          // Solo colapsar en dispositivos móviles
+          if (window.innerWidth < 768) {
+            setIsSidebarOpen(false);
+          }
+        }} />
       </aside>
       <div className="flex-1 flex flex-col">
         <DashboardHeader onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />

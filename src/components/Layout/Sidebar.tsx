@@ -1,19 +1,25 @@
 import { cn } from "@/lib/utils";
-import { UserRole } from "@prisma/client";
 import { useAuth } from "@/context/AuthContext";
+
+// Definir los roles de usuario disponibles
+type UserRole = 'USER' | 'OWNER' | 'BUILDING_ADMIN' | 'SUPER_ADMIN';
 import { useNavigate } from "react-router-dom";
-import { Building2, LogOut, Home, Users, Settings, FileText, Calendar, ClipboardList, Key, Wrench, Grid } from "lucide-react";
+import { Building2, LogOut, Home, Users, Settings, FileText, Calendar, ClipboardList, Key, Wrench, Grid, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 
-interface Props {}
+interface Props {
+  onNavigate?: () => void;
+}
 
-export function Sidebar({}: Props) {
+export function Sidebar({ onNavigate }: Props) {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
+      // Notificar navegación antes de logout (colapsará el sidebar en móviles)
+      onNavigate?.();
       await logout();
       navigate("/login");
     } catch (error) {
@@ -73,6 +79,12 @@ export function Sidebar({}: Props) {
       roles: ['BUILDING_ADMIN'] as UserRole[]
     },
     {
+      title: "Reglamento",
+      icon: BookOpen,
+      path: "/regulations",
+      roles: ['BUILDING_ADMIN', 'OWNER'] as UserRole[]
+    },
+    {
       title: "Usuarios",
       icon: Users,
       path: "/users",
@@ -109,7 +121,11 @@ export function Sidebar({}: Props) {
                   key={index}
                   variant="ghost"
                   className="w-full justify-start"
-                  onClick={() => navigate(item.path)}
+                  onClick={() => {
+                    navigate(item.path);
+                    // Notificar al componente padre que se ha navegado
+                    onNavigate?.();
+                  }}
                 >
                   <item.icon className="mr-2 h-4 w-4" />
                   {item.title}
