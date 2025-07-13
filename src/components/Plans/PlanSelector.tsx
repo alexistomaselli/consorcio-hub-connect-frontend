@@ -65,7 +65,7 @@ interface PlanSelectorProps {
 
 export function PlanSelector({ onPlanSelect }: PlanSelectorProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 w-full max-w-full overflow-hidden">
       {plans.map((plan) => (
         <Card 
           key={plan.name}

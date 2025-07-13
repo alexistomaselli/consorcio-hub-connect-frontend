@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Definimos una URL base con un fallback en caso de que la variable de entorno no esté disponible
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 console.log('API Base URL:', API_BASE_URL); // Verificamos la URL base que se está usando
 
 // Función para suprimir errores de red específicos en consola

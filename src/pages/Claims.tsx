@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Claim, ClaimStatus, ClaimLocation } from '@/types/claim';
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
+import { PlusCircle, Search, Settings, Loader2, Eye, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 
 // Interfaces para respuestas de API
 interface TablesCheckResponse {
@@ -13,9 +16,6 @@ interface TablesSetupResponse {
   success: boolean;
   message: string;
 }
-import { api } from '@/lib/api';
-import { toast } from 'sonner';
-import { PlusCircle, Search, Settings, Loader2, Eye, Pencil, Trash2, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -282,15 +282,28 @@ const Claims = () => {
     return locations[location] || location;
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('es-AR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(date);
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return 'Fecha no disponible';
+    
+    try {
+      const date = new Date(dateStr);
+      
+      // Verificar si la fecha es válida
+      if (isNaN(date.getTime())) {
+        return 'Fecha inválida';
+      }
+      
+      return new Intl.DateTimeFormat('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }).format(date);
+    } catch (error) {
+      console.error('Error al formatear fecha:', error);
+      return 'Fecha inválida';
+    }
   };
-  
+
   // Determina si el reclamo pertenece al usuario actual
   const isOwnClaim = (claim: Claim) => {
     return claim.creatorId === currentUser?.id;
