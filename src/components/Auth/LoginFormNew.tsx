@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -13,43 +14,38 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginFormData {
   identifier: string;
   password: string;
+  rememberMe?: boolean;
 }
 
 const LoginFormNew = () => {
-  const { login } = useAuth();
+  const { login, resendVerificationEmail } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loginMethod, setLoginMethod] = useState<'email' | 'whatsapp'>('email');
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginFormData>({
     defaultValues: {
       identifier: '',
       password: '',
+      rememberMe: false,
     },
     resolver: async (values) => {
       const errors: Record<string, { type: string; message: string }> = {};
-      
+
       if (!values.identifier) {
         errors.identifier = {
           type: 'required',
-          message: loginMethod === 'email' 
-            ? 'El correo electrónico es requerido' 
-            : 'El número de WhatsApp es requerido',
+          message: 'El correo electrónico es requerido',
         };
-      } else if (loginMethod === 'email' && !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(values.identifier)) {
+      } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(values.identifier)) {
         errors.identifier = {
           type: 'pattern',
           message: 'Correo electrónico inválido',
-        };
-      } else if (loginMethod === 'whatsapp' && !/^\+?[0-9]{10,15}$/.test(values.identifier)) {
-        errors.identifier = {
-          type: 'pattern',
-          message: 'Número de WhatsApp inválido',
         };
       }
 
@@ -72,47 +68,78 @@ const LoginFormNew = () => {
     },
   });
 
+  const location = useLocation();
+
+  React.useEffect(() => {
+    if (location.state?.registrationSuccess && location.state?.message) {
+      toast({
+        title: '¡Cuenta creada!',
+        description: location.state.message,
+        className: 'bg-green-50 border-green-200 text-green-900',
+        duration: 6000,
+      });
+      if (location.state?.email) {
+        form.setValue('identifier', location.state.email);
+      }
+      window.history.replaceState({}, document.title);
+    }
+  }, [location, form]);
+
   const onSubmit = async (data: LoginFormData) => {
     try {
-      console.log('Iniciando proceso de login con:', { 
-        method: loginMethod, 
-        identifier: data.identifier 
-      });
       setIsSubmitting(true);
-      
-      // Aquí determinamos qué método de login usar basado en la pestaña activa
-      let redirectTo;
-      
-      if (loginMethod === 'email') {
-        redirectTo = await login(data.identifier, data.password);
-      } else {
-        // Para WhatsApp, podríamos necesitar adaptar la función login o crear una nueva
-        redirectTo = await login(data.identifier, data.password, 'whatsapp');
-      }
-      
+
+      // Defaulting to email login
+      const redirectTo = await login(data.identifier, data.password);
+
       console.log('Login exitoso, redirigiendo a:', redirectTo);
       toast({
         title: 'Inicio de sesión exitoso',
-        description: redirectTo === '/settings/building' 
-          ? 'Por favor, configure WhatsApp para continuar'
-          : 'Bienvenido de nuevo',
+        description: 'Bienvenido de nuevo',
       });
       navigate(redirectTo);
     } catch (error: any) {
-      console.error('Error detallado de inicio de sesión:', {
-        message: error?.message,
-        name: error?.name,
-        code: error?.code,
-        status: error?.status,
-      });
-      
-      toast({
-        title: 'Error de inicio de sesión',
-        description: error?.message || 'Ocurrió un error al intentar iniciar sesión',
-        variant: 'destructive',
-      });
-      
-      // Limpiar el campo de contraseña
+      // Handle specific "Email not confirmed" error
+      if (error?.message?.includes('Email not confirmed')) {
+        toast({
+          title: 'Correo no confirmado',
+          description: 'Por favor, verifica tu correo electrónico para activar tu cuenta.',
+          variant: 'destructive',
+          action: (
+            <div className="flex flex-col gap-2 w-full">
+              <Button
+                variant="default"
+                size="sm"
+                className="w-full bg-white text-red-600 hover:bg-gray-100 border-none"
+                onClick={async () => {
+                  toast({ title: 'Reenviando...', description: 'Enviando nuevo correo de verificación.' });
+                  const { error: resendError } = await resendVerificationEmail(data.identifier);
+                  if (resendError) {
+                    toast({
+                      title: 'Error',
+                      description: 'No se pudo reenviar el correo. Intente más tarde.',
+                      variant: 'destructive',
+                    });
+                  } else {
+                    toast({
+                      title: 'Correo enviado',
+                      description: 'Revise su bandeja de entrada (y spam).',
+                    });
+                  }
+                }}
+              >
+                Reenviar correo
+              </Button>
+            </div>
+          ),
+        });
+      } else {
+        toast({
+          title: 'Error de inicio de sesión',
+          description: error?.message || 'Credenciales inválidas',
+          variant: 'destructive',
+        });
+      }
       form.setValue('password', '');
     } finally {
       setIsSubmitting(false);
@@ -120,124 +147,105 @@ const LoginFormNew = () => {
   };
 
   return (
-    <Tabs 
-      defaultValue="email" 
-      className="w-full" 
-      onValueChange={(value) => setLoginMethod(value as 'email' | 'whatsapp')}
-    >
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="email">Email</TabsTrigger>
-        <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-      </TabsList>
-      
-      <TabsContent value="email">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="identifier"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Correo electrónico</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="email" 
-                      placeholder="correo@ejemplo.com" 
-                      {...field} 
-                      autoComplete="email" 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+        <FormField
+          control={form.control}
+          name="identifier"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-slate-700 font-semibold">Correo Electrónico</FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  placeholder="admin@consorciohub.com"
+                  className="bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 h-10 px-4"
+                  {...field}
+                  autoComplete="email"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contraseña</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="password" 
-                      placeholder="••••••••" 
-                      {...field} 
-                      autoComplete="current-password" 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-slate-700 font-semibold">Contraseña</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    className="bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 h-10 px-4 pr-10"
+                    {...field}
+                    autoComplete="current-password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-slate-400 hover:text-slate-600"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                    <span className="sr-only">
+                      {showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    </span>
+                  </Button>
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-            <div className="flex items-center justify-between">
-              <Link to="/forgot-password" className="text-sm text-consorcio-blue hover:underline">
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
+        <div className="flex items-center justify-between pt-1">
+          <FormField
+            control={form.control}
+            name="rememberMe"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    className="border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel className="text-slate-600 font-medium cursor-pointer">
+                    Recordarme
+                  </FormLabel>
+                </div>
+              </FormItem>
+            )}
+          />
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
-            </Button>
-          </form>
-        </Form>
-      </TabsContent>
-      
-      <TabsContent value="whatsapp">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="identifier"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número de WhatsApp</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="tel" 
-                      placeholder="+54XXXXXXXXXX" 
-                      {...field} 
-                      autoComplete="tel"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <Link
+            to="/forgot-password"
+            className="text-[13px] font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contraseña</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="password" 
-                      placeholder="••••••••" 
-                      {...field} 
-                      autoComplete="current-password" 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex items-center justify-between">
-              <Link to="/forgot-password" className="text-sm text-consorcio-blue hover:underline">
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
-            </Button>
-          </form>
-        </Form>
-      </TabsContent>
-    </Tabs>
+        <Button
+          type="submit"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold h-11 text-[15px] shadow-sm mt-2"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+        </Button>
+      </form>
+    </Form>
   );
 };
 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -35,7 +34,8 @@ const registerSchema = z.object({
   confirmPassword: z.string(),
   buildingName: z.string()
     .min(3, 'El nombre del edificio debe tener al menos 3 caracteres')
-    .max(100, 'El nombre del edificio no puede tener más de 100 caracteres')
+    .max(100, 'El nombre del edificio no puede tener más de 100 caracteres'),
+
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden',
   path: ['confirmPassword'],
@@ -74,8 +74,6 @@ const RegisterAdminForm = ({ selectedPlan }: RegisterAdminFormProps) => {
   });
 
   const onSubmit = async (data: RegisterFormData) => {
-    console.log('Form data:', data);
-    console.log('Selected plan:', selectedPlan);
     if (data.password !== data.confirmPassword) {
       toast({
         title: 'Error',
@@ -87,59 +85,53 @@ const RegisterAdminForm = ({ selectedPlan }: RegisterAdminFormProps) => {
 
     try {
       setIsSubmitting(true);
-      
+
       const registerData = {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
         password: data.password,
-        building: {
-          name: data.buildingName,
-          address: '', // Por ahora lo dejamos vacío, se completará en el perfil
-          schema: data.buildingName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-        }
+        buildingName: data.buildingName,
+        planName: selectedPlan.name
       };
 
-      console.log('Sending register data:', registerData);
       const result = await registerAdmin(registerData);
-      console.log('Register response:', result);
-      
-      // Verificar si el resultado contiene un error
-      if (typeof result === 'object' && 'error' in result) {
-        // Mostrar el mensaje de error
+
+      if (result && result.error) {
         toast({
           title: 'Error de registro',
-          description: result.error,
+          description: result.error.message || 'Error desconocido',
           variant: 'destructive',
         });
-        return; // Terminar la ejecución de la función
+        return;
       }
-      
-      // Si llegamos aquí, el registro fue exitoso
+
       toast({
-        title: '¡Bienvenido!',
-        description: selectedPlan.name === 'FREE'
-          ? 'Su cuenta ha sido creada y su período de prueba ha comenzado'
-          : 'Su cuenta ha sido creada exitosamente',
+        title: '¡Registro exitoso!',
+        description: 'Por favor, revisa tu correo electrónico para confirmar tu cuenta.',
       });
-      
-      // El token ya debería estar almacenado en localStorage por el AuthContext
-      
-      // Redirigir a la URL devuelta por registerAdmin
-      if (result === '/verify-email') {
-        navigate('/verify-email');
-      } else {
-        navigate('/dashboard');
-      }
+
+      navigate('/login', {
+        state: {
+          email: data.email,
+          registrationSuccess: true,
+          message: '¡Registro exitoso! Te hemos enviado un correo de confirmación. Por favor, revísalo para activar tu cuenta.'
+        }
+      });
     } catch (error: any) {
       console.error('Error de registro:', error);
-      // Obtener el mensaje de error de diferentes posibles estructuras
-      const errorMessage = 
-        error.message || 
-        error.response?.data?.message || 
-        error.error?.message ||
-        'Ocurrió un error al crear su cuenta';
-      
+      let errorMessage = 'Ocurrió un error al crear su cuenta';
+
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.className === 'AuthApiError' || error?.message) {
+        errorMessage = error.message;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.error_description || error?.error?.message) {
+        errorMessage = error.error_description || error.error.message;
+      }
+
       toast({
         title: 'Error de registro',
         description: errorMessage,
@@ -152,17 +144,21 @@ const RegisterAdminForm = ({ selectedPlan }: RegisterAdminFormProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+
+        {/* Información personal */}
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2 mb-4">Información personal</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <FormField
               control={form.control}
               name="firstName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre</FormLabel>
+                  <FormLabel className="text-slate-700 font-medium">Nombre</FormLabel>
                   <FormControl>
-                    <Input placeholder="Juan" {...field} />
+                    <Input placeholder="Juan" {...field} className="bg-slate-50 border-slate-200 focus:bg-white transition-colors h-11" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -174,9 +170,9 @@ const RegisterAdminForm = ({ selectedPlan }: RegisterAdminFormProps) => {
               name="lastName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Apellido</FormLabel>
+                  <FormLabel className="text-slate-700 font-medium">Apellido</FormLabel>
                   <FormControl>
-                    <Input placeholder="Pérez" {...field} />
+                    <Input placeholder="Pérez" {...field} className="bg-slate-50 border-slate-200 focus:bg-white transition-colors h-11" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -189,33 +185,40 @@ const RegisterAdminForm = ({ selectedPlan }: RegisterAdminFormProps) => {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Correo electrónico</FormLabel>
+                <FormLabel className="text-slate-700 font-medium">Correo electrónico</FormLabel>
                 <FormControl>
                   <Input
                     type="email"
                     placeholder="nombre@ejemplo.com"
                     {...field}
                     autoComplete="email"
+                    className="bg-slate-50 border-slate-200 focus:bg-white transition-colors h-11"
                   />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Contraseña */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2 mb-4 mt-2">Contraseña</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <FormField
               control={form.control}
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contraseña</FormLabel>
+                  <FormLabel className="text-slate-700 font-medium">Contraseña</FormLabel>
                   <FormControl>
                     <Input
                       type="password"
                       placeholder="********"
                       {...field}
                       autoComplete="new-password"
+                      className="bg-slate-50 border-slate-200 focus:bg-white transition-colors h-11"
                     />
                   </FormControl>
                   <FormMessage />
@@ -228,13 +231,14 @@ const RegisterAdminForm = ({ selectedPlan }: RegisterAdminFormProps) => {
               name="confirmPassword"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Confirmar contraseña</FormLabel>
+                  <FormLabel className="text-slate-700 font-medium">Confirmar contraseña</FormLabel>
                   <FormControl>
                     <Input
                       type="password"
                       placeholder="********"
                       {...field}
                       autoComplete="new-password"
+                      className="bg-slate-50 border-slate-200 focus:bg-white transition-colors h-11"
                     />
                   </FormControl>
                   <FormMessage />
@@ -242,32 +246,38 @@ const RegisterAdminForm = ({ selectedPlan }: RegisterAdminFormProps) => {
               )}
             />
           </div>
+        </div>
+
+        {/* Información del edificio */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-slate-900 border-b border-slate-100 pb-2 mb-4 mt-2">Información del edificio</h3>
 
           <FormField
             control={form.control}
             name="buildingName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Nombre del edificio</FormLabel>
+                <FormLabel className="text-slate-700 font-medium">Nombre del edificio</FormLabel>
                 <FormControl>
-                  <Input placeholder="Edificio San Martín" {...field} />
+                  <Input placeholder="Edificio 1" {...field} className="bg-slate-50 border-slate-200 focus:bg-white transition-colors h-11" />
                 </FormControl>
+                <div className="text-xs text-slate-500 mt-1">Ingrese el nombre exacto del edificio donde reside (o administra).</div>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? 'Registrando...' : 'Comenzar prueba gratis'}
+        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold h-12 text-[15px] shadow-sm mt-6" disabled={isSubmitting}>
+          {isSubmitting ? 'Registrando...' : 'Registrar'}
         </Button>
 
-        <div className="text-center mt-4">
-          <p className="text-sm text-consorcio-gray-500">
-            ¿Ya tiene una cuenta?{' '}
-            <Link to="/login" className="text-consorcio-blue hover:underline">
-              Iniciar sesión
-            </Link>
+        <div className="flex flex-col items-center justify-center space-y-3 mt-6 border-t pt-6 bg-slate-50/50 rounded-b-lg -mx-6 px-6 pb-2">
+          <p className="text-sm text-slate-600 font-medium">
+            ¿Ya tienes una cuenta? <Link to="/login" className="text-blue-600 hover:underline font-bold">Iniciar sesión</Link>
+          </p>
+          <p className="text-sm text-slate-600 font-medium">
+            ¿Administra un edificio? <Link to="/register" className="text-blue-600 hover:underline font-bold">Registrar edificio</Link>
           </p>
         </div>
       </form>

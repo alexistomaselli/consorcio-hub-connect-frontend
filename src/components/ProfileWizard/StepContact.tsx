@@ -9,8 +9,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { WhatsAppInput, validateWhatsApp } from '../ui/whatsapp-input';
 
 const schema = z.object({
-  phoneNumber: z.string().min(1, 'El teléfono es requerido'),
-  whatsapp: z.string().min(1, 'El WhatsApp es requerido'),
+  phoneNumber: z.string().optional(),
+  whatsapp: z.string().optional(),
   email: z.string().min(1, 'El email es requerido'),
   website: z.string().optional(),
   description: z.string().min(10, 'La descripción debe tener al menos 10 caracteres').optional()
@@ -61,7 +61,7 @@ export function StepContact({ defaultValues, onSubmit }: Props) {
             name="phoneNumber"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Teléfono Fijo *</FormLabel>
+                <FormLabel>Teléfono Fijo (Opcional)</FormLabel>
                 <FormControl>
                   <Input placeholder="Teléfono Fijo" {...field} />
                 </FormControl>
@@ -75,10 +75,13 @@ export function StepContact({ defaultValues, onSubmit }: Props) {
             name="whatsapp"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>WhatsApp *</FormLabel>
+                <FormLabel>WhatsApp (Opcional)</FormLabel>
                 <FormControl>
                   <WhatsAppInput {...field} />
                 </FormControl>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Si el edificio tiene un número de atención, cárgalo aquí. Si usarás nuestro Asistente Virtual (Bot), podrás configurarlo más adelante.
+                </p>
                 <FormMessage />
               </FormItem>
             )}

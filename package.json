@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 8084 --host",
+    "dev": "vite --port 8085 --host",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
@@ -46,6 +46,7 @@
     "@radix-ui/react-toggle": "^1.1.0",
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.4",
+    "@supabase/supabase-js": "^2.88.0",
     "@tanstack/react-query": "^5.56.2",
     "@types/axios": "^0.9.36",
     "@types/uuid": "^10.0.0",

@@ -1,10 +1,9 @@
-
 import React from 'react';
-import { Link, useLocation, Navigate } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { useLocation, Navigate } from 'react-router-dom';
+import LandingNavbar from '@/components/Layout/LandingNavbar';
+import LandingFooter from '@/components/Layout/LandingFooter';
 import RegisterAdminForm from '@/components/Auth/RegisterAdminForm';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
 
 const Register = () => {
   const location = useLocation();
@@ -16,75 +15,34 @@ const Register = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-3xl">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold">Registro de administrador</h1>
-          <p className="text-gray-600 mt-2">
-            Complete sus datos para comenzar
-          </p>
-        </div>
+    <div className="font-sans antialiased bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col min-h-screen">
+      <LandingNavbar />
 
-        {/* Plan Summary */}
-        <div className="mb-8">
-          <Alert className="bg-blue-50 border-blue-200">
-            <div className="flex items-start">
-              <div className="flex-1">
-                <h3 className="font-semibold text-blue-800 mb-2">
-                  Plan seleccionado: {selectedPlan.name}
-                </h3>
-                <AlertDescription className="text-blue-700">
-                  <ul className="space-y-1">
-                    <li className="flex items-center">
-                      <Check className="h-4 w-4 mr-2" />
-                      Prueba gratuita por 14 días
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="h-4 w-4 mr-2" />
-                      Acceso a todas las funcionalidades
-                    </li>
-                    <li className="flex items-center">
-                      <Check className="h-4 w-4 mr-2" />
-                      Sin compromiso
-                    </li>
-                  </ul>
-                </AlertDescription>
+      <div className="flex-grow flex flex-col items-center justify-center py-16 px-4 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-[600px] bg-white shadow-2xl rounded-2xl p-8 sm:p-12 border-0">
+          <div className="flex flex-col items-center mb-8">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="bg-slate-900 text-white p-1.5 rounded-md">
+                {/* Logo Icon based on screenshot */}
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2L2 12L12 22L22 12L12 2Z" />
+                </svg>
               </div>
-              <div className="text-right">
-                <Link to="/" className="text-blue-600 hover:underline text-sm">
-                  Cambiar plan
-                </Link>
-              </div>
+              <span className="text-xl font-bold tracking-tight text-slate-900">ConsorcioHub</span>
             </div>
-          </Alert>
-        </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Complete sus datos</CardTitle>
-            <CardDescription>
-              La información básica para comenzar
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RegisterAdminForm selectedPlan={selectedPlan} />
-          </CardContent>
-          <CardFooter className="flex flex-col items-center justify-center space-y-2 border-t pt-6">
-            <p className="text-sm text-gray-500">
-              ¿Ya tiene una cuenta?{' '}
-              <Link to="/login" className="text-blue-600 hover:underline">
-                Iniciar sesión
-              </Link>
+
+            <h1 className="text-3xl font-bold text-slate-900 mb-3 text-center">Registro de Administrador</h1>
+            <p className="text-center text-slate-500 text-[15px] leading-relaxed max-w-sm mx-auto">
+              Cree una cuenta para comenzar a gestionar sus edificios y consorcios.
             </p>
-            <p className="text-sm text-gray-500">
-              ¿Es un residente?{' '}
-              <Link to="/register-user" className="text-blue-600 hover:underline">
-                Registrarse como usuario
-              </Link>
-            </p>
-          </CardFooter>
+          </div>
+
+          <RegisterAdminForm selectedPlan={selectedPlan} />
+
         </Card>
       </div>
+
+      <LandingFooter />
     </div>
   );
 };

@@ -1,17 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { api } from '@/lib/api';
-import { PlusCircle, Home, Search, Edit, UserPlus, Trash2, Eye, Loader2, Grid, LayoutGrid } from 'lucide-react';
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
+import { PlusCircle, Search, Edit, Trash2, Grid, LayoutGrid, Loader2, Save, X, Building, Users } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -19,14 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -36,9 +23,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
-import SpacesSetupWizard from '@/components/Spaces/SpacesSetupWizard';
-import BuildingView from '@/components/Spaces/BuildingView';
-import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,15 +33,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-// Definición de tipos para las respuestas de la API
-interface SpaceTablesResponse {
-  error?: boolean;
-  message?: string;
-  setup_required?: boolean;
-}
-
-// Definición de tipos
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 
 interface Space {
   id: string;
@@ -65,18 +42,12 @@ interface Space {
   type: {
     id: string;
     name: string;
-    description?: string;
     isReservable: boolean;
     isAssignable: boolean;
   };
   floor?: string;
   description?: string;
-  owners?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    isMain: boolean;
-  }[];
+  owners?: any[]; // Keep flexible for now, or define if needed
 }
 
 interface SpaceType {
@@ -85,1737 +56,915 @@ interface SpaceType {
   description?: string;
   isReservable: boolean;
   isAssignable: boolean;
+  isActive: boolean;
 }
 
 export default function Spaces() {
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
   const { toast } = useToast();
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [spaceTypes, setSpaceTypes] = useState<SpaceType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
-  const [tablesExist, setTablesExist] = useState<boolean | null>(null);
-  
-  // Estado para el diálogo de confirmación de desvinculación
-  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
-  const [ownerToRemove, setOwnerToRemove] = useState<{spaceId: string, ownerId: string, isMain: boolean} | null>(null);
-  const [isConfiguringTables, setIsConfiguringTables] = useState(false);
-  const [showSetupWizard, setShowSetupWizard] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'building'>('building');
-  
-  // Estados para los modales
+  const [unitTypeId, setUnitTypeId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("common");
+
+  // Modals state
   const [showAddSpaceModal, setShowAddSpaceModal] = useState(false);
-  const [showAddTypeModal, setShowAddTypeModal] = useState(false);
-  const [showAddOwnerModal, setShowAddOwnerModal] = useState(false);
-  const [currentSpaceForOwner, setCurrentSpaceForOwner] = useState<Space | null>(null);
-  const [owners, setOwners] = useState<{ id: string; firstName: string; lastName: string; email: string }[]>([]);
-  const [selectedOwnerId, setSelectedOwnerId] = useState('');
-  const [isMainOwner, setIsMainOwner] = useState(false);
-  const [loadingOwners, setLoadingOwners] = useState(false);
-  const [assigningOwner, setAssigningOwner] = useState(false);
-  const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
+  const [showAddUnitModal, setShowAddUnitModal] = useState(false);
   const [showEditSpaceModal, setShowEditSpaceModal] = useState(false);
+
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [showManageTypesModal, setShowManageTypesModal] = useState(false);
+
+  // Selection state
   const [spaceToEdit, setSpaceToEdit] = useState<Space | null>(null);
   const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showGenerateUnitsModal, setShowGenerateUnitsModal] = useState(false);
-  
-  // Estados para la gestión de tipos de espacios
-  const [showManageTypesModal, setShowManageTypesModal] = useState(false);
   const [typeToEdit, setTypeToEdit] = useState<SpaceType | null>(null);
-  const [typeToDelete, setTypeToDelete] = useState<SpaceType | null>(null);
-  const [showDeleteTypeConfirmModal, setShowDeleteTypeConfirmModal] = useState(false);
-  const [isDeletingType, setIsDeletingType] = useState(false);
-  
-  // Estado para el formulario de nuevo espacio
+
+  // Form handling
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newSpace, setNewSpace] = useState({
     name: '',
     typeId: '',
     floor: '',
     description: ''
   });
-  const [isSubmittingSpace, setIsSubmittingSpace] = useState(false);
-  
-  // Estados para el formulario de tipo de espacio
-  const [newSpaceType, setNewSpaceType] = useState({
+
+  const [newUnit, setNewUnit] = useState({
+    name: '',
+    floor: '',
+    description: ''
+  });
+
+  const [newSpaceType, setNewSpaceType] = useState<Partial<SpaceType>>({
     name: '',
     description: '',
     isReservable: false,
-    isAssignable: false
+    isAssignable: false,
+    isActive: true
   });
-  const [typeFormErrors, setTypeFormErrors] = useState<{name?: string}>({});
-  const [isSubmittingType, setIsSubmittingType] = useState(false);
 
-  // Verificar si las tablas de espacios existen
-  const checkSpaceTablesExist = async () => {
-    if (!user?.buildingId) return;
-    
-    try {
-      console.log(`Verificando existencia de tablas para building: ${user.buildingId}`);
-      
-      // Intentar con retries y timeouts ajustados para reducir errores en consola
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos de timeout
-      
-      const response = await api.get<SpaceTablesResponse>(
-        `/buildings/${user.buildingId}/spaces/check-tables`,
-        { 
-          // @ts-ignore - signal está disponible pero TypeScript no lo reconoce correctamente
-          signal: controller.signal,
-          timeout: 8000
+  // Batch Creation State
+  const [showBatchCreateModal, setShowBatchCreateModal] = useState(false);
+  const [batchConfig, setBatchConfig] = useState({
+    totalFloors: '0',
+    unitsPerFloor: '0',
+    startFloor: '0', // 0 for PB, 1 for 1st floor
+    nomenclature: '1A' as '1A' | '101' | 'A1',
+  });
+  const [previewUnits, setPreviewUnits] = useState<{ name: string; floor: string }[]>([]);
+
+  // Update preview when config changes
+  useEffect(() => {
+    if (!showBatchCreateModal) return;
+
+    const floors = parseInt(batchConfig.totalFloors) || 0;
+    const units = parseInt(batchConfig.unitsPerFloor) || 0;
+    const start = parseInt(batchConfig.startFloor) || 0;
+    const generated: { name: string; floor: string }[] = [];
+
+    if (floors > 0 && units > 0) {
+      for (let f = 0; f < floors; f++) {
+        const floorNum = start + f;
+        const floorStr = floorNum === 0 ? 'PB' : floorNum.toString();
+
+        for (let u = 0; u < units; u++) {
+          let unitName = '';
+          const letter = String.fromCharCode(65 + u); // A, B, C...
+
+          switch (batchConfig.nomenclature) {
+            case '1A':
+              unitName = `${floorStr}${letter}`;
+              break;
+            case '101':
+              // If floor is PB, maybe just use number 1, 2... or PB-1?
+              // Standard hotel style: Floor 1 -> 101, Floor 2 -> 201
+              if (floorNum === 0) {
+                unitName = `PB-${u + 1}`;
+              } else {
+                unitName = `${floorNum}${String(u + 1).padStart(2, '0')}`;
+              }
+              break;
+            case 'A1':
+              // Letter first logic not standard for multi-floor but user asked?
+              // Let's assume Tower A, Unit 1? Or just A1, A2... usually per floor needs floor indicator.
+              // Let's stick to "Block/Letter + Number" style if needed, but for now simple 1A is best.
+              // User example: "A, B, C...". If single floor or just sequential?
+              // Let's implement A1 as: Unit A on Floor 1? No, usually 1A is Floor 1 Unit A.
+              // User said: "A, B, C... etc". Maybe just letters?
+              // Let's stick to 1A and 101 for now as safe defaults, and maybe just Letter if floors=1.
+              // For "A1", let's assume FloorStr + Letter is "1A".
+              // Let's try to interpret "A1" as "Letter + Floor"?
+              unitName = `${letter}${floorStr}`;
+              break;
+          }
+          generated.push({ name: unitName, floor: floorStr });
         }
-      ).catch(e => {
-        console.warn('Error al verificar tablas:', e.message || e.code || e.name);
-        
-        // En caso de errores de conexión, asumir que las tablas existen para evitar mostrar el botón
-        if (e.name === 'AbortError' || 
-            e.code === 'ECONNABORTED' || 
-            e.code === 'ETIMEDOUT' || 
-            e.message?.includes('timeout') ||
-            e.message?.includes('Network Error')) {
-          // Asumir que las tablas existen en caso de errores de conexión
-          return { data: { setup_required: false } };
-        }
-        
-        // Para otros tipos de errores, reenviamos el error
-        throw e;
-      });
-      
-      clearTimeout(timeoutId);
-      
-      // Si se requiere configuración, mostrar el botón para configurar
-      if (response.data.setup_required) {
-        console.log('Se requiere configuración de tablas de espacios');
-        setTablesExist(false);
-      } else {
-        console.log('Tablas de espacios ya existen, cargando datos...');
-        setTablesExist(true);
-        // Cargar datos solo si las tablas existen
-        await fetchRealData();
       }
-    } catch (error) {
-      // Si hay un error no relacionado con la conexión, asumimos que las tablas ya existen
-      // Esto evita mostrar el botón de configuración cuando no podemos determinar con certeza
-      console.warn('Error al verificar tablas, asumiendo que existen');
-      setTablesExist(true);
-      await fetchRealData();
+    }
+    setPreviewUnits(generated);
+  }, [batchConfig, showBatchCreateModal]);
+
+
+  const handleOpenBatchModal = async () => {
+    // Pre-fill from building data if possible
+    setShowBatchCreateModal(true);
+    if (currentUser?.buildingId) {
+      const { data } = await supabase.from('buildings').select('floors, totalUnits').eq('id', currentUser.buildingId).single();
+      if (data) {
+        setBatchConfig(prev => ({
+          ...prev,
+          totalFloors: data.floors?.toString() || '0',
+          // Approximate units per floor if total is known?
+          unitsPerFloor: data.totalUnits && data.floors ? Math.ceil(data.totalUnits / data.floors).toString() : '0'
+        }));
+      }
     }
   };
 
-  // Función para configurar las tablas de espacios
-  const configureTables = async () => {
-    if (!user?.buildingId) return;
-    
-    setIsConfiguringTables(true);
-    
+  const handleBatchCreate = async () => {
+    if (!unitTypeId || previewUnits.length === 0) return;
+
+    setIsSubmitting(true);
     try {
-      await api.post(`/buildings/${user.buildingId}/spaces/setup-tables`);
-      toast({
-        title: 'Éxito',
-        description: 'Tablas configuradas correctamente. Ahora configuremos los tipos de espacios.'
-      });
-      // Actualizar el estado y mostrar el wizard
-      setTablesExist(true);
-      setShowSetupWizard(true); // Mostrar automáticamente el wizard
+      const unitsToInsert = previewUnits.map(u => ({
+        name: u.name,
+        floor: u.floor,
+        spaceTypeId: unitTypeId,
+        buildingId: currentUser?.buildingId,
+        description: 'Generado automáticamente'
+      }));
+
+      const { error } = await supabase.from('spaces').insert(unitsToInsert);
+      if (error) throw error;
+
+      // Update building info with new configuration if it was used
+      if (currentUser?.buildingId) {
+        const floors = parseInt(batchConfig.totalFloors) || 0;
+        const unitsPerFloor = parseInt(batchConfig.unitsPerFloor) || 0;
+        const calculatedTotalUnits = floors * unitsPerFloor;
+
+        // Silent update to persist building metadata
+        // Only update if we have valid non-zero values
+        if (floors > 0) {
+          await supabase.from('buildings').update({
+            floors: floors,
+            totalUnits: calculatedTotalUnits
+          }).eq('id', currentUser.buildingId);
+        }
+      }
+
+      toast({ title: "Éxito", description: `${unitsToInsert.length} unidades creadas y configuración guardada.` });
+      setShowBatchCreateModal(false);
+      fetchSpaces();
     } catch (error) {
-      console.error('Error al configurar tablas:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudieron configurar las tablas',
-        variant: 'destructive'
-      });
+      console.error(error);
+      toast({ title: "Error", description: "Falló la creación masiva", variant: "destructive" });
     } finally {
-      setIsConfiguringTables(false);
+      setIsSubmitting(false);
     }
   };
 
-  // Función que se ejecuta cuando el wizard completa la configuración
-  const handleSetupComplete = async () => {
-    setShowSetupWizard(false);
-    setTablesExist(true);
-    await fetchRealData();
-  };
+  const fetchSpaces = async () => {
+    if (!currentUser?.buildingId) return;
 
-  // Función para cargar datos reales de la API con manejo de errores silencioso
-  const fetchRealData = async () => {
-    if (!user?.buildingId) return;
-    
     setIsLoading(true);
-    
     try {
-      // Configuración común para las llamadas a la API con cancelación automática
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos de timeout
-      
-      const axiosConfig = {
-        signal: controller.signal,
-        headers: { 'Cache-Control': 'no-cache' }
-      };
-      
-      // Cargar tipos de espacios con manejo de errores silencioso
-      let typesData: SpaceType[] = [];
-      try {
-        const typesResponse = await api.get<SpaceType[]>(
-          `/buildings/${user.buildingId}/spaces/types`, 
-          axiosConfig
-        ).catch(e => {
-          if (e.name === 'AbortError' || e.code === 'ECONNABORTED') {
-            return { data: [] as SpaceType[] };
-          }
-          throw e;
-        });
-        
-        clearTimeout(timeoutId);
-        typesData = typesResponse.data;
-        setSpaceTypes(typesData);
-      } catch (typeError) {
-        // Error silencioso
-      }
-      
-      // Cargar espacios con sus tipos
-      try {
-        const spacesResponse = await api.get<Space[]>(
-          `/buildings/${user.buildingId}/spaces`,
-          axiosConfig
-        ).catch(e => {
-          if (e.name === 'AbortError' || e.code === 'ECONNABORTED') {
-            return { data: [] as Space[] };
-          }
-          throw e;
-        });
-        
-        console.log('Datos de espacios recibidos:', spacesResponse.data);
-        console.log('Total de espacios:', spacesResponse.data.length);
-        
-        // Verificar si hay unidades según los criterios de BuildingView
-        const units = spacesResponse.data.filter(space => 
-          space.type.name === 'Unidad' || 
-          space.name.match(/^[0-9]+$/) || // números solos
-          space.name.match(/^[A-Z]?[0-9]+$/)); // letra opcional seguida de números
-        
-        console.log('Unidades detectadas para vista de edificio:', units.length);
-        if (units.length === 0) {
-          console.log('No se detectaron unidades para la vista de edificio');
-        } else {
-          console.log('Unidades:', units);
+      // Fetch spaces with their types
+      const { data: spacesData, error: spacesError } = await supabase
+        .from('spaces')
+        .select(`
+          *,
+          type:space_types!spaceTypeId (*)
+        `)
+        .eq('buildingId', currentUser.buildingId)
+        .order('name');
+
+      if (spacesError) throw spacesError;
+
+      // Fetch space types
+      const { data: typesData, error: typesError } = await supabase
+        .from('space_types')
+        .select('*')
+        .eq('buildingId', currentUser.buildingId)
+        .order('name');
+
+      if (typesError) throw typesError;
+
+      // Map DB snake_case to frontend camelCase if needed, or just use snake_case
+      // For simplicity, let's keep frontend interface but map from DB
+      const mappedTypes = (typesData || []).map(t => ({
+        ...t,
+        isReservable: t.is_reservable,
+        isAssignable: t.is_assignable,
+        isActive: t.isActive !== false // Default to true if null/undefined
+      }));
+
+      setSpaces(spacesData?.map(s => ({
+        ...s,
+        type: {
+          ...s.type,
+          isReservable: s.type?.is_reservable,
+          isAssignable: s.type?.is_assignable
         }
-        
-        setSpaces(spacesResponse.data);
-      } catch (spacesError) {
-        // Error silencioso
-      }
-      
-      // Si no se pudo cargar nada, usar datos simulados en desarrollo
-      if (typesData.length === 0 && process.env.NODE_ENV === 'development') {
-        loadMockData();
-      }
+      })) || []);
+      setSpaceTypes(mappedTypes);
+
+      const unitType = mappedTypes.find(t => t.name === 'Unidad');
+      if (unitType) setUnitTypeId(unitType.id);
+
     } catch (error) {
-      // Fallback para desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        loadMockData();
-      }
+      console.error('Error fetching data:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los espacios",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Función para abrir el modal de edición de espacios
-  const handleEditSpace = (space: Space) => {
-    setSpaceToEdit(space);
-    setShowEditSpaceModal(true);
-  };
+  useEffect(() => {
+    fetchSpaces();
+  }, [currentUser?.buildingId]);
 
-  // Función para guardar los cambios de un espacio editado
-  const handleSaveEditedSpace = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!spaceToEdit || !user?.buildingId) return;
-    
-    // Validación
-    if (!spaceToEdit.name.trim() || !spaceToEdit.type.id) {
-      toast({
-        title: 'Error',
-        description: 'El nombre y tipo son obligatorios',
-        variant: 'destructive'
-      });
+  // Ensure "Unidad" type exists
+  useEffect(() => {
+    const ensureUnitType = async () => {
+      if (!currentUser?.buildingId || isLoading || unitTypeId) return;
+
+      // Check if we already have it in the fetched types (double check)
+      const existing = spaceTypes.find(t => t.name === 'Unidad');
+      if (existing) {
+        setUnitTypeId(existing.id);
+        return;
+      }
+
+      // If not, create it
+      try {
+        const { data, error } = await supabase.from('space_types').insert({
+          name: 'Unidad',
+          description: 'Unidad Funcional / Departamento',
+          is_reservable: false, // Usually units are private, not reservable common spaces
+          is_assignable: true,
+          buildingId: currentUser.buildingId,
+          isActive: true
+        }).select().single();
+
+        if (error) throw error;
+        if (data) {
+          setUnitTypeId(data.id);
+          fetchSpaces(); // Refresh list to show it
+        }
+      } catch (err) {
+        console.error("Error creating system unit type:", err);
+      }
+    };
+
+    if (!isLoading && spaceTypes.length > 0) {
+      ensureUnitType();
+    }
+  }, [currentUser?.buildingId, isLoading, spaceTypes, unitTypeId]);
+
+  const handleCreateSpace = async () => {
+    if (!currentUser?.buildingId || !newSpace.name || !newSpace.typeId) {
+      toast({ title: "Error", description: "Completa los campos requeridos", variant: "destructive" });
       return;
     }
-    
-    setIsSubmittingSpace(true);
-    
+
+    setIsSubmitting(true);
     try {
-      // Estructura de datos para la API
-      const spaceData = {
-        name: spaceToEdit.name,
-        typeId: spaceToEdit.type.id,
-        floor: spaceToEdit.floor || '',
-        description: spaceToEdit.description || ''
-      };
-      
-      // Actualizar el espacio
-      await api.patch(`/buildings/${user.buildingId}/spaces/${spaceToEdit.id}`, spaceData);
-      
-      toast({
-        title: 'Éxito',
-        description: 'Espacio actualizado correctamente'
+      const { error } = await supabase.from('spaces').insert({
+        name: newSpace.name,
+        spaceTypeId: newSpace.typeId,
+        floor: newSpace.floor,
+        description: newSpace.description,
+        buildingId: currentUser.buildingId
       });
-      
-      // Cerrar el modal y actualizar la lista
+
+      if (error) throw error;
+
+      toast({ title: "Éxito", description: "Espacio creado correctamente" });
+      setShowAddSpaceModal(false);
+      setNewSpace({ name: '', typeId: '', floor: '', description: '' });
+      fetchSpaces();
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "No se pudo crear el espacio", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateUnit = async () => {
+    if (!currentUser?.buildingId || !newUnit.name || !unitTypeId) {
+      toast({ title: "Error", description: "Completa los campos requeridos", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('spaces').insert({
+        name: newUnit.name,
+        spaceTypeId: unitTypeId,
+        floor: newUnit.floor,
+        description: newUnit.description,
+        buildingId: currentUser.buildingId
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Éxito", description: "Unidad creada correctamente" });
+      setShowAddUnitModal(false);
+      setNewUnit({ name: '', floor: '', description: '' });
+      fetchSpaces();
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "No se pudo crear la unidad", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateSpace = async () => {
+    if (!spaceToEdit) return;
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('spaces').update({
+        name: newSpace.name,
+        spaceTypeId: newSpace.typeId,
+        floor: newSpace.floor,
+        description: newSpace.description
+      }).eq('id', spaceToEdit.id);
+
+      if (error) throw error;
+
+      toast({ title: "Éxito", description: "Espacio actualizado" });
       setShowEditSpaceModal(false);
       setSpaceToEdit(null);
-      await fetchRealData();
+      fetchSpaces();
     } catch (error) {
-      console.error('Error al actualizar espacio:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar el espacio',
-        variant: 'destructive'
-      });
+      console.error(error);
+      toast({ title: "Error", description: "Fallo al actualizar", variant: "destructive" });
     } finally {
-      setIsSubmittingSpace(false);
+      setIsSubmitting(false);
     }
   };
 
-  // Función para abrir el modal de confirmación de eliminación
-  const handleDeleteSpace = (space: Space) => {
-    setSpaceToDelete(space);
-    setShowDeleteConfirmModal(true);
-  };
-
-  // Función para eliminar un espacio
-  const confirmDeleteSpace = async () => {
-    if (!spaceToDelete || !user?.buildingId) return;
-    
-    setIsDeleting(true);
-    
+  const handleDeleteSpace = async () => {
+    if (!spaceToDelete) return;
     try {
-      // Eliminar el espacio - manejamos la respuesta independientemente del status HTTP
-      try {
-        // Intentar eliminar el espacio con gestión adecuada de la respuesta
-        const response = await api.delete(`/buildings/${user.buildingId}/spaces/${spaceToDelete.id}`);
-        console.log('Respuesta de eliminación:', response.data);
-        
-        // Considerar exitoso incluso si devuelve un objeto con campo success
-        toast({
-          title: 'Éxito',
-          description: 'Espacio eliminado correctamente'
-        });
-        
-        // Cerrar el modal y actualizar la lista
-        setShowDeleteConfirmModal(false);
-        setSpaceToDelete(null);
-        await fetchRealData();
-      } catch (apiError: any) {
-        // Verificar si realmente hubo un error o si solo es un formato de respuesta inesperado
-        if (apiError.response?.data?.success === true) {
-          // La operación fue exitosa a pesar del error HTTP
-          console.log('Operación exitosa a pesar del error HTTP:', apiError.response.data);
-          
-          toast({
-            title: 'Éxito',
-            description: 'Espacio eliminado correctamente'
-          });
-          
-          // Cerrar el modal y actualizar la lista
-          setShowDeleteConfirmModal(false);
-          setSpaceToDelete(null);
-          await fetchRealData();
-          return;
-        }
-        
-        // Si llegamos aquí, es un error genuino
-        throw apiError;
-      }
-    } catch (error: any) {
-      // El mensaje de error puede estar en diferentes lugares según el tipo de error
-      const errorMessage = error.response?.data?.message || error.message || 'No se pudo eliminar el espacio';
-      
-      console.error('Error al eliminar espacio:', error);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      });
-    } finally {
-      setIsDeleting(false);
+      const { error } = await supabase.from('spaces').delete().eq('id', spaceToDelete.id);
+      if (error) throw error;
+      toast({ title: "Eliminado", description: "Espacio eliminado" });
+      setShowDeleteConfirmModal(false);
+      fetchSpaces();
+    } catch (error) {
+      toast({ title: "Error", description: "No se pudo eliminar", variant: "destructive" });
     }
   };
 
-  // Función para abrir el modal de edición de tipo de espacio
-  const handleEditSpaceType = (type: SpaceType) => {
+  const handleCreateType = async () => {
+    if (!currentUser?.buildingId || !newSpaceType.name) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('space_types').insert({
+        name: newSpaceType.name,
+        description: newSpaceType.description,
+        is_reservable: newSpaceType.isReservable,
+        is_assignable: newSpaceType.isAssignable,
+        buildingId: currentUser.buildingId,
+        isActive: true
+      });
+      if (error) throw error;
+      toast({ title: "Éxito", description: "Tipo creado" });
+      fetchSpaces(); // Refresh types list
+      setNewSpaceType({ name: '', description: '', isReservable: false, isAssignable: false, isActive: true });
+    } catch (error) {
+      toast({ title: "Error", description: "Error al crear tipo", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateType = async () => {
+    if (!typeToEdit) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('space_types').update({
+        name: newSpaceType.name,
+        description: newSpaceType.description,
+        is_reservable: newSpaceType.isReservable,
+        is_assignable: newSpaceType.isAssignable,
+        // isActive is handled separately or included if we want to edit it here too
+      }).eq('id', typeToEdit.id);
+
+      if (error) throw error;
+      toast({ title: "Éxito", description: "Tipo actualizado" });
+      fetchSpaces();
+      setTypeToEdit(null);
+      setNewSpaceType({ name: '', description: '', isReservable: false, isAssignable: false, isActive: true });
+    } catch (error) {
+      toast({ title: "Error", description: "Error al actualizar tipo", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleTypeStatus = async (type: SpaceType) => {
+    try {
+      const { error } = await supabase.from('space_types').update({
+        isActive: !type.isActive
+      }).eq('id', type.id);
+
+      if (error) throw error;
+      // Optimistic update or refetch
+      fetchSpaces();
+      toast({ title: "Estado actualizado", description: `Tipo ${!type.isActive ? 'activado' : 'desactivado'}` });
+    } catch (error) {
+      toast({ title: "Error", description: "No se pudo cambiar el estado", variant: "destructive" });
+    }
+  };
+
+  const startEditType = (type: SpaceType) => {
     setTypeToEdit(type);
     setNewSpaceType({
       name: type.name,
       description: type.description || '',
       isReservable: type.isReservable,
-      isAssignable: type.isAssignable
+      isAssignable: type.isAssignable,
+      isActive: type.isActive
     });
-    setShowManageTypesModal(false); // Cerrar el modal de administración
-    setShowAddTypeModal(true); // Abrir el modal de edición
   };
 
-  // Función para actualizar un tipo de espacio
-  const handleUpdateSpaceType = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!typeToEdit || !user?.buildingId) return;
-    
-    // Validación
-    if (!newSpaceType.name.trim()) {
-      toast({
-        title: 'Error',
-        description: 'El nombre es obligatorio',
-        variant: 'destructive'
-      });
-      return;
-    }
-    
-    // Logs para depuración
-    console.log('Actualizando tipo de espacio:', {
-      buildingId: user.buildingId,
-      spaceTypeId: typeToEdit.id, // Usando spaceTypeId en lugar de typeId para mayor claridad
-      data: newSpaceType
-    });
-    
-    setIsSubmittingType(true);
-    
-    // Actualizar el tipo de espacio en la base de datos real
-    
-    // Si no estamos en modo simulación, continuar con la llamada real a la API
-    Promise.resolve(
-      api.patch<SpaceType>(
-        `/buildings/${user.buildingId}/spaces/types/${typeToEdit.id}`,
-        JSON.stringify(newSpaceType),
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      )
-    )
-      .then((response) => {
-        // Actualizar el tipo en el state local
-        const updatedTypes = spaceTypes.map(type => 
-          type.id === typeToEdit?.id ? response.data : type
-        );
-        setSpaceTypes(updatedTypes);
-        
-        toast({
-          title: 'Éxito',
-          description: 'Tipo de espacio actualizado correctamente'
-        });
-        
-        // Cerrar el modal y actualizar la lista
-        setShowAddTypeModal(false);
-        setTypeToEdit(null);
-        
-        // Recargar datos para asegurar que tenemos la versión más actualizada
-        fetchRealData();
-        
-        // Resetear formulario
-        setNewSpaceType({
-          name: '',
-          description: '',
-          isReservable: false,
-          isAssignable: false
-        });
-        
-        // Resetear el estado
-        setIsSubmittingType(false);
-      })
-      .catch((error) => {
-        console.error('Error al actualizar tipo de espacio:', error);
-        // Mostrar más detalles del error para mejor diagnóstico
-        const errorMessage = error.response?.data?.message || 
-                            error.response?.data?.error || 
-                            error.message || 
-                            'Error desconocido';
-        console.log('Detalles del error:', {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          message: errorMessage,
-          data: error.response?.data
-        });
-        
-        toast({
-          title: 'Error',
-          description: `No se pudo actualizar el tipo de espacio: ${errorMessage}`,
-          variant: 'destructive'
-        });
-        setIsSubmittingType(false);
-      });
+  const cancelEditType = () => {
+    setTypeToEdit(null);
+    setNewSpaceType({ name: '', description: '', isReservable: false, isAssignable: false, isActive: true });
   };
 
-  // Función para abrir el modal de confirmación de eliminación de tipo
-  const handleDeleteSpaceType = (type: SpaceType) => {
-    setTypeToDelete(type);
-    setShowDeleteTypeConfirmModal(true);
-  };
 
-  // Función para eliminar un tipo de espacio
-  const confirmDeleteSpaceType = () => {
-    if (!typeToDelete || !user?.buildingId) return;
-    
-    setIsDeletingType(true);
-    
-    // Eliminar el tipo de espacio usando Promise.resolve para mejor manejo
-    Promise.resolve(
-      api.delete(`/buildings/${user.buildingId}/spaces/types/${typeToDelete.id}`)
-    )
-      .then(() => {
-        // Eliminar el tipo del state local
-        setSpaceTypes(spaceTypes.filter(type => type.id !== typeToDelete.id));
-        
-        toast({
-          title: 'Éxito',
-          description: 'Tipo de espacio eliminado correctamente'
-        });
-        
-        // Cerrar el modal y actualizar la lista
-        setShowDeleteTypeConfirmModal(false);
-        setTypeToDelete(null);
-        
-        // Recargar datos para asegurar que tenemos la versión más actualizada
-        fetchRealData();
-        
-        // Resetear el estado
-        setIsDeletingType(false);
-      })
-      .catch((error) => {
-        console.error('Error al eliminar tipo de espacio:', error);
-        
-        // Verificar si es el error específico de espacios asociados
-        let errorMessage = 'No se pudo eliminar el tipo de espacio';
-        if (error.response?.data?.message?.includes('espacios asociados')) {
-          errorMessage = 'No se puede eliminar porque tiene espacios asociados';
-        }
-        
-        toast({
-          title: 'Error',
-          description: errorMessage,
-          variant: 'destructive'
-        });
-        
-        setIsDeletingType(false);
-      });
-  };
-
-  // Función para cargar datos simulados - versión limpia con manejo de errores
-  const loadMockData = () => {
-    try {
-      console.log('Cargando datos simulados...');
-      
-      // Datos ficticios para tipos de espacios
-      const mockSpaceTypes: SpaceType[] = [
-        { 
-          id: '1', 
-          name: 'Área común', 
-          description: 'Espacios de uso común para todos los residentes',
-          isReservable: true,
-          isAssignable: false
-        },
-        { 
-          id: '2', 
-          name: 'Estacionamiento', 
-          description: 'Espacios para aparcar vehículos',
-          isReservable: false,
-          isAssignable: true
-        },
-        { 
-          id: '3', 
-          name: 'Salón de eventos', 
-          description: 'Espacios para eventos y reuniones',
-          isReservable: true,
-          isAssignable: false
-        }
-      ];
-      
-      // Datos ficticios para espacios
-      const mockSpaces: Space[] = [
-        {
-          id: '1',
-          name: 'SUM',
-          type: { 
-            id: mockSpaceTypes[2].id,
-            name: mockSpaceTypes[2].name,
-            description: mockSpaceTypes[2].description,
-            isReservable: mockSpaceTypes[2].isReservable,
-            isAssignable: mockSpaceTypes[2].isAssignable
-          },
-          floor: 'PB',
-          description: 'Salón de usos múltiples con capacidad para 50 personas',
-          owners: [
-            { id: '1', firstName: 'Admin', lastName: 'Building', isMain: true }
-          ]
-        },
-        {
-          id: '2',
-          name: 'Estacionamiento A1',
-          type: { 
-            id: mockSpaceTypes[1].id,
-            name: mockSpaceTypes[1].name,
-            description: mockSpaceTypes[1].description,
-            isReservable: mockSpaceTypes[1].isReservable,
-            isAssignable: mockSpaceTypes[1].isAssignable
-          },
-          floor: 'S1',
-          description: 'Estacionamiento cubierto',
-          owners: [
-            { id: '2', firstName: 'Juan', lastName: 'Pérez', isMain: true }
-          ]
-        },
-        {
-          id: '3',
-          name: 'Terraza',
-          type: { 
-            id: mockSpaceTypes[0].id,
-            name: mockSpaceTypes[0].name,
-            description: mockSpaceTypes[0].description,
-            isReservable: mockSpaceTypes[0].isReservable,
-            isAssignable: mockSpaceTypes[0].isAssignable
-          },
-          floor: '10',
-          description: 'Terraza con parrilla y zona de estar',
-          owners: []
-        }
-      ];
-      
-      // Actualizar el estado con los datos simulados
-      setSpaceTypes(mockSpaceTypes);
-      setSpaces(mockSpaces);
-      
-      console.log('Datos simulados cargados exitosamente');
-    } catch (error) {
-      console.warn('Error al cargar datos simulados, usando datos básicos');
-      // Intentar con datos mínimos en caso de error
-      const basicType: SpaceType = { 
-        id: '1', 
-        name: 'Tipo de espacio básico', 
-        description: '', 
-        isReservable: false, 
-        isAssignable: false 
-      };
-      
-      setSpaceTypes([basicType]);
-      setSpaces([{ 
-        id: '1', 
-        name: 'Espacio básico', 
-        type: { 
-          id: basicType.id, 
-          name: basicType.name, 
-          description: basicType.description,
-          isReservable: basicType.isReservable, 
-          isAssignable: basicType.isAssignable 
-        }, 
-        floor: '',
-        description: '',
-        owners: []
-      }]);
-    }
-  };
-  
-  // Cargar datos al montar el componente
-  useEffect(() => {
-    checkSpaceTablesExist();
-  }, [user?.buildingId]);
-
-  // Filtrado de espacios por búsqueda y tipo
   const filteredSpaces = spaces.filter(space => {
-    const matchesSearch = 
-      space.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      space.floor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      space.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      space.type.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (space.owners?.some(owner => 
-        `${owner.firstName} ${owner.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
-      ));
-    
+    const matchesSearch = space.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      space.type.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = selectedType === 'all' || space.type.id === selectedType;
-    
     return matchesSearch && matchesType;
   });
-  
-  // Función para mostrar el diálogo de confirmación de desvinculación
-  const handleRemoveOwner = (spaceId: string, ownerId: string, isMain: boolean) => {
-    setOwnerToRemove({ spaceId, ownerId, isMain });
-    setShowRemoveDialog(true);
-  };
-  
-  // Función para confirmar la desvinculación del propietario
-  const confirmRemoveOwner = async () => {
-    if (!user?.buildingId || !ownerToRemove) return;
-    
-    try {
-      await api.delete(
-        `/buildings/${user.buildingId}/spaces/${ownerToRemove.spaceId}/owners/${ownerToRemove.ownerId}`,
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-      
-      // Actualizar el estado local
-      setSpaces(prevSpaces => {
-        return prevSpaces.map(space => {
-          if (space.id === ownerToRemove.spaceId) {
-            return {
-              ...space,
-              owners: space.owners?.filter(owner => owner.id !== ownerToRemove.ownerId)
-            };
-          }
-          return space;
-        });
-      });
-      
-      toast({
-        title: "Propietario desvinculado",
-        description: "El propietario ha sido desvinculado correctamente del espacio.",
-      });
-      
-      // Cerrar el diálogo
-      setShowRemoveDialog(false);
-      setOwnerToRemove(null);
-    } catch (error: any) {
-      console.error('Error al desvincular propietario:', error);
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "No se pudo desvincular al propietario del espacio.",
-        variant: "destructive"
-      });
-      setShowRemoveDialog(false);
-      setOwnerToRemove(null);
-    }
-  };
-  
-  // Función para abrir el modal de asignación de propietario
-  const handleAssignOwner = (spaceId: string) => {
-    setSelectedSpaceId(spaceId);
-    setCurrentSpaceForOwner(spaces.find(space => space.id === spaceId) || null);
-    setSelectedOwnerId('');
-    setIsMainOwner(false);
-    setShowAddOwnerModal(true);
-    loadOwners();
-  };
-  
-  // Función para cargar los propietarios disponibles
-  const loadOwners = async () => {
-    if (!user?.buildingId) return;
-    
-    setLoadingOwners(true);
-    
-    try {
-      console.log('Cargando propietarios para el edificio:', user.buildingId);
-      const response = await api.get(`/owners/buildings/${user.buildingId}`);
-      console.log('Respuesta completa:', response);
-      console.log('Datos de propietarios recibidos:', response.data);
-      
-      if (response.data && Array.isArray(response.data)) {
-        // Verificar si hay propietarios en la respuesta
-        if (response.data.length > 0) {
-          console.log('Primer propietario:', response.data[0]);
-          setOwners(response.data.map(owner => ({
-            id: owner.id,
-            firstName: owner.firstName || '',
-            lastName: owner.lastName || '',
-            email: owner.email || ''
-          })));
-        } else {
-          console.log('No se encontraron propietarios para este edificio');
-          setOwners([]);
-        }
-      } else {
-        console.error('La respuesta no tiene el formato esperado:', response.data);
-        setOwners([]);
-      }
-    } catch (error) {
-      console.error('Error al cargar propietarios:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudieron cargar los propietarios',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoadingOwners(false);
-    }
-  };
-  
-  // Función para asignar un propietario a un espacio
-  const handleSaveOwnerAssignment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!user?.buildingId || !currentSpaceForOwner || !selectedOwnerId) {
-      toast({
-        title: 'Error',
-        description: 'Datos incompletos para asignar propietario',
-        variant: 'destructive'
-      });
-      return;
-    }
-    
-    setAssigningOwner(true);
-    
-    try {
-      console.log('Intentando asignar propietario:', {
-        buildingId: user.buildingId,
-        spaceId: currentSpaceForOwner.id,
-        ownerId: selectedOwnerId,
-        isMain: isMainOwner
-      });
-      
-      const response = await api.post(`/buildings/${user.buildingId}/spaces/${currentSpaceForOwner.id}/owners`, {
-        ownerId: selectedOwnerId,
-        isMain: isMainOwner
-      });
-      
-      console.log('Respuesta exitosa:', response.data);
-      
-      toast({
-        title: 'Éxito',
-        description: 'Propietario asignado correctamente',
-      });
-      
-      // Recargamos los espacios para ver los cambios
-      fetchRealData();
-      setShowAddOwnerModal(false);
-    } catch (error: any) {
-      console.error('Error al asignar propietario:', error);
-      console.error('Detalles del error:', {
-        mensaje: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        config: error.config
-      });
-      
-      let errorMessage = 'No se pudo asignar el propietario';
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      }
-      
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive'
-      });
-    } finally {
-      setAssigningOwner(false);
-    }
-  };
 
-  const toggleViewMode = () => {
-    setViewMode(viewMode === 'list' ? 'building' : 'list');
-  };
+  const commonSpaces = filteredSpaces.filter(s => s.type.name !== 'Unidad');
+  const unitSpaces = filteredSpaces.filter(s => s.type.name === 'Unidad');
 
-  // Renderizado del componente
   return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Espacios</h1>
-        {tablesExist === false ? (
-          <div></div>
-        ) : (
-          <div className="flex space-x-2">
-            <div className="flex items-center mr-4 space-x-2 border rounded-md px-3 py-1.5">
-              <LayoutGrid 
-                className={`h-4 w-4 cursor-pointer ${viewMode === 'building' ? 'text-primary' : 'text-gray-400'}`} 
-                onClick={() => setViewMode('building')} 
-              />
-              <Switch 
-                checked={viewMode === 'list'}
-                onCheckedChange={toggleViewMode}
-              />
-              <Grid 
-                className={`h-4 w-4 cursor-pointer ${viewMode === 'list' ? 'text-primary' : 'text-gray-400'}`} 
-                onClick={() => setViewMode('list')} 
-              />
-            </div>
-            <Button 
-              onClick={() => setShowAddSpaceModal(true)} 
-              variant="default"
-              className="space-x-2"
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span>Nuevo espacio</span>
-            </Button>
-            <Button 
-              onClick={() => setShowManageTypesModal(true)} 
-              variant="outline"
-              className="space-x-2"
-            >
-              <Home className="h-4 w-4" />
-              <span>Tipos de espacios</span>
-            </Button>
-          </div>
-        )}
+    <div className="container mx-auto py-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Espacios</h1>
+          <p className="text-muted-foreground mt-1">Gestiona los espacios comunes y unidades de tu edificio.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowManageTypesModal(true)}>
+            Tipos de espacios
+          </Button>
+          <Button onClick={() => setShowAddSpaceModal(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Nuevo espacio
+          </Button>
+        </div>
       </div>
 
-      {tablesExist === false && !isConfiguringTables && (
-      <div className="bg-amber-50 border border-amber-200 rounded-md p-6 text-center">
-        <h2 className="text-xl font-semibold mb-2">Configuración inicial requerida</h2>
-        <p className="mb-4">Es necesario configurar las tablas de espacios antes de comenzar.</p>
-        <Button onClick={configureTables} disabled={isConfiguringTables}>
-          {isConfiguringTables ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Configurando...
-            </>
-          ) : (
-            'Configurar ahora'
-          )}
-        </Button>
-      </div>
-    )}
-    
-    {tablesExist && (
-      <div className="space-y-4">
-        {/* Buscador y filtros */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-grow">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+
+
+      <Tabs defaultValue="common" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="common" className="flex items-center gap-2">
+            <LayoutGrid className="h-4 w-4" /> Espacios Comunes
+          </TabsTrigger>
+          <TabsTrigger value="units" className="flex items-center gap-2">
+            <Building className="h-4 w-4" /> Unidades Funcionales
+          </TabsTrigger>
+        </TabsList>
+
+        <div className="flex items-center space-x-2 mb-6 bg-white p-4 rounded-lg border shadow-sm">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              type="search"
-              placeholder="Buscar espacios..."
+              placeholder={activeTab === 'units' ? "Buscar unidad..." : "Buscar por nombre o tipo..."}
               className="pl-8"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-[280px]">
-              <SelectValue placeholder="Todos los tipos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              {spaceTypes.map(type => (
-                <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        {/* Spaces display section */}
-        {filteredSpaces.length === 0 ? (
-          <div className="text-center py-10">
-            <p className="text-muted-foreground">
-              No se encontraron espacios {searchTerm && 'con los filtros aplicados'}
-            </p>
-            <Button
-              variant="link"
-              onClick={() => {
-                setSearchTerm('');
-                setSelectedType('all');
-              }}
-              className="mt-2"
-            >
-              Limpiar filtros
-            </Button>
-          </div>
-        ) : viewMode === 'building' ? (
-          <div className="mt-4">
-            <BuildingView 
-              spaces={filteredSpaces} 
-              onEditSpace={handleEditSpace} 
-              onDeleteSpace={handleDeleteSpace} 
-              onAssignOwner={handleAssignOwner}
-              onRemoveOwner={handleRemoveOwner}
-            />
-          </div>
-        ) : (
-          <div className="rounded-md border mt-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Piso</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSpaces.map(space => (
-                  <TableRow key={space.id}>
-                    <TableCell className="font-medium">{space.name}</TableCell>
-                    <TableCell>{space.type.name}</TableCell>
-                    <TableCell>{space.floor || '-'}</TableCell>
-                    <TableCell>{space.description || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        {space.type.isAssignable && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Asignar propietario"
-                            onClick={() => {
-                              // Implementar función para asignar propietario
-                              console.log('Asignar propietario a:', space);
-                            }}
-                          >
-                            <UserPlus className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditSpace(space)}
-                          title="Editar espacio"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteSpace(space)}
-                          title="Eliminar espacio"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+          {activeTab === 'common' && (
+            <Select value={selectedType} onValueChange={setSelectedType}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filtrar por tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                {spaceTypes.filter(t => t.name !== 'Unidad').map(type => (
+                  <SelectItem key={type.id} value={type.id} disabled={!type.isActive} className={!type.isActive ? 'opacity-50' : ''}>
+                    {type.name} {!type.isActive && '(Inactivo)'}
+                  </SelectItem>
                 ))}
-              </TableBody>
-            </Table>
+              </SelectContent>
+            </Select>
+          )}
+          {activeTab === 'units' && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleOpenBatchModal} disabled={!unitTypeId}>
+                <Grid className="mr-2 h-4 w-4" /> Generar en Lote
+              </Button>
+              <Button onClick={() => setShowAddUnitModal(true)} disabled={!unitTypeId}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Nueva Unidad
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <TabsContent value="common" className="mt-0">
+          {isLoading ? (
+            <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : commonSpaces.length === 0 ? (
+            <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed">
+              <LayoutGrid className="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <h3 className="mt-4 text-lg font-semibold">No se encontraron espacios comunes</h3>
+              <p className="text-muted-foreground">Crea tipos (ej. SUM, Cochera) y espacios para comenzar.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {commonSpaces.map(space => (
+                <Card key={space.id} className="p-5 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-3">
+                    <Badge variant="outline" className="bg-slate-50">{space.type.name}</Badge>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={() => {
+                          setSpaceToEdit(space);
+                          setNewSpace({
+                            name: space.name,
+                            typeId: space.type.id,
+                            floor: space.floor || '',
+                            description: space.description || ''
+                          });
+                          setShowEditSpaceModal(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          setSpaceToDelete(space);
+                          setShowDeleteConfirmModal(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    {space.type.isReservable && <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none px-2 py-0.5 text-[10px]">Reservable</Badge>}
+                    {space.type.isAssignable && <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-2 py-0.5 text-[10px]">Asignable</Badge>}
+                  </div>
+                  <h3 className="text-xl font-bold mb-1">{space.name}</h3>
+                  {space.floor && <p className="text-sm text-muted-foreground mb-2">Piso: {space.floor}</p>}
+                  <p className="text-sm text-slate-600 line-clamp-2">{space.description || "Sin descripción"}</p>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="units" className="mt-0">
+          {isLoading ? (
+            <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : unitSpaces.length === 0 ? (
+            <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed">
+              <Building className="mx-auto h-12 w-12 text-muted-foreground/50" />
+              <h3 className="mt-4 text-lg font-semibold">No se encontraron unidades</h3>
+              <p className="text-muted-foreground">Crea unidades (departamentos) para asignar propietarios.</p>
+              <Button variant="outline" className="mt-4" onClick={() => setShowAddUnitModal(true)}>
+                Crear primera unidad
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {unitSpaces.map(space => (
+                <Card key={space.id} className="p-4 hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
+                  <div className="flex justify-between items-start mb-2">
+                    <Badge variant="secondary" className="text-xs">Unidad</Badge>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary"
+                        onClick={() => {
+                          setSpaceToEdit(space);
+                          setNewSpace({
+                            name: space.name,
+                            typeId: space.type.id,
+                            floor: space.floor || '',
+                            description: space.description || ''
+                          });
+                          setShowEditSpaceModal(true); // Can reuse standard edit modal as it reads from state
+                        }}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          setSpaceToDelete(space);
+                          setShowDeleteConfirmModal(true);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800">{space.name}</h3>
+                  {space.floor && <p className="text-sm font-medium text-slate-500">Piso {space.floor}</p>}
+                  {space.description && <p className="text-xs text-slate-400 mt-1">{space.description}</p>}
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Add Space Modal */}
+      <Dialog open={showAddSpaceModal} onOpenChange={setShowAddSpaceModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo Espacio</DialogTitle>
+            <DialogDescription>Completa los detalles del nuevo espacio.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Nombre</Label>
+              <Input id="name" value={newSpace.name} onChange={e => setNewSpace({ ...newSpace, name: e.target.value })} placeholder="Ej. SUM, Cochera 1" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="type">Tipo</Label>
+              <Select value={newSpace.typeId} onValueChange={val => setNewSpace({ ...newSpace, typeId: val })}>
+                <SelectTrigger><SelectValue placeholder="Selecciona el tipo" /></SelectTrigger>
+                <SelectContent>
+                  {spaceTypes.filter(t => t.isActive).map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="floor">Piso/Ubicación (Opcional)</Label>
+              <Input id="floor" value={newSpace.floor} onChange={e => setNewSpace({ ...newSpace, floor: e.target.value })} placeholder="Ej. PB, Subsuelo" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="desc">Descripción (Opcional)</Label>
+              <Input id="desc" value={newSpace.description} onChange={e => setNewSpace({ ...newSpace, description: e.target.value })} />
+            </div>
           </div>
-        )}
-      </div>
-    )}
-  
-  
-  {/* Modales para crear/editar espacios y tipos */}
-  <Dialog open={showAddSpaceModal} onOpenChange={setShowAddSpaceModal}>
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>Crear nuevo espacio</DialogTitle>
-        <DialogDescription>
-          Ingresa los detalles del nuevo espacio
-        </DialogDescription>
-      </DialogHeader>
-          
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            
-            // Validaciones
-            if (!newSpace.name.trim()) {
-              toast({
-                title: 'Error',
-                description: 'El nombre es obligatorio',
-                variant: 'destructive'
-              });
-              return;
-            }
-            
-            if (!newSpace.typeId) {
-              toast({
-                title: 'Error',
-                description: 'Debes seleccionar un tipo de espacio',
-                variant: 'destructive'
-              });
-              return;
-            }
-            
-            setIsSubmittingSpace(true);
-            
-            // Verificar que tenemos buildingId
-            if (!user?.buildingId) {
-              toast({
-                title: 'Error',
-                description: 'No se pudo identificar el edificio',
-                variant: 'destructive'
-              });
-              setIsSubmittingSpace(false);
-              return;
-            }
-            
-            // Datos para crear el espacio
-            // IMPORTANTE: El backend espera 'spaceTypeId', no 'typeId'
-            const spaceData = {
-              name: newSpace.name.trim(),
-              spaceTypeId: newSpace.typeId,  // Convertimos typeId del formulario a spaceTypeId que espera el backend
-              floor: newSpace.floor?.trim() || '',
-              description: newSpace.description?.trim() || ''
-            };
-            
-            // Loguear datos para depuración
-            console.log('Datos para crear espacio:', spaceData);
-            console.log(`URL: /buildings/${user.buildingId}/spaces`);
-            
-            // Crear el espacio con axios directamente para mejor manejo de errores
-            api.post<Space>(`/buildings/${user.buildingId}/spaces`, spaceData)
-              .then((response) => {
-                // Loguear la respuesta completa para depuración
-                console.log('Respuesta del servidor al crear espacio:', response.data);
-                
-                // Éxito
-                setShowAddSpaceModal(false);
-                setNewSpace({
-                  name: '',
-                  typeId: '',
-                  floor: '',
-                  description: ''
-                });
-                
-                toast({
-                  title: 'Éxito',
-                  description: 'Espacio creado correctamente'
-                });
-                
-                // Recargar datos
-                fetchRealData();
-                
-                // Resetear el estado de submitting en caso de éxito
-                setIsSubmittingSpace(false);
-              })
-              .catch((error) => {
-                // Loguear detalles del error para mejor diagnóstico
-                console.error('Error al crear espacio:', error);
-                console.error('Detalles del error:', {
-                  status: error.response?.status,
-                  statusText: error.response?.statusText,
-                  message: error.response?.data?.message || error.message || 'Error desconocido',
-                  data: error.response?.data
-                });
-                
-                // Mostrar mensaje de error más detallado si está disponible
-                const errorMessage = error.response?.data?.message || error.message || 'Error desconocido';
-                toast({
-                  title: 'Error',
-                  description: `No se pudo crear el espacio: ${errorMessage}`,
-                  variant: 'destructive'
-                });
-                
-                // Set submitting state to false on error
-                setIsSubmittingSpace(false);
-              })
-              .then(() => {
-                // Asegurarnos que siempre se ejecute este bloque al final, similar a finally
-                // Pero solo necesitamos hacerlo para el caso de éxito ya que el error ya maneja su propio estado
-              });
-          }}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
-                  Nombre
-                </Label>
-                <Input
-                  id="name"
-                  value={newSpace.name}
-                  onChange={(e) => setNewSpace({
-                    ...newSpace,
-                    name: e.target.value
-                  })}
-                  className="col-span-3"
-                  placeholder="Ej: Sala de Reuniones"
-                />
-              </div>
-              
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="type" className="text-right">
-                  Tipo
-                </Label>
-                <Select 
-                  value={newSpace.typeId} 
-                  onValueChange={(value) => setNewSpace({
-                    ...newSpace,
-                    typeId: value
-                  })}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Seleccionar tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {spaceTypes.map(type => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="floor" className="text-right">
-                  Piso
-                </Label>
-                <Input
-                  id="floor"
-                  value={newSpace.floor}
-                  onChange={(e) => setNewSpace({
-                    ...newSpace,
-                    floor: e.target.value
-                  })}
-                  className="col-span-3"
-                  placeholder="Ej: PB, 1, 2, etc."
-                />
-              </div>
-              
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">
-                  Descripción
-                </Label>
-                <Input
-                  id="description"
-                  value={newSpace.description}
-                  onChange={(e) => setNewSpace({
-                    ...newSpace,
-                    description: e.target.value
-                  })}
-                  className="col-span-3"
-                  placeholder="Descripción opcional"
-                />
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddSpaceModal(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmittingSpace}>
-                {isSubmittingSpace ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creando...
-                  </>
-                ) : 'Crear espacio'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showAddTypeModal} onOpenChange={setShowAddTypeModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {typeToEdit ? 'Editar tipo de espacio' : 'Crear nuevo tipo de espacio'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <form onSubmit={(e) => {
-            setTypeFormErrors({});
-            
-            // Si estamos editando, usar handleUpdateSpaceType
-            if (typeToEdit) {
-              handleUpdateSpaceType(e);
-              return;
-            }
-            
-            // Validación
-            if (!newSpaceType.name.trim()) {
-              setTypeFormErrors({
-                name: 'El nombre es obligatorio'
-              });
-              return;
-            }
-            
-            e.preventDefault();
-            setIsSubmittingType(true);
-            
-            // Verificar que tenemos buildingId
-            if (!user?.buildingId) {
-              toast({
-                title: 'Error',
-                description: 'No se pudo identificar el edificio',
-                variant: 'destructive'
-              });
-              setIsSubmittingType(false);
-              return;
-            }
-            
-            // Crear el tipo de espacio
-            Promise.resolve(
-              api.post<SpaceType>(`/buildings/${user.buildingId}/spaces/types`, newSpaceType)
-            )
-              .then((response) => {
-                // Actualizar la lista de tipos
-                setSpaceTypes([...spaceTypes, response.data]);
-                
-                // Cerrar el modal y limpiar el formulario
-                setShowAddTypeModal(false);
-                setNewSpaceType({
-                  name: '',
-                  description: '',
-                  isReservable: false,
-                  isAssignable: false
-                });
-                
-                toast({
-                  title: 'Éxito',
-                  description: 'Tipo de espacio creado correctamente'
-                });
-              })
-              .catch((error) => {
-                console.error('Error al crear tipo de espacio:', error);
-                toast({
-                  title: 'Error',
-                  description: 'No se pudo crear el tipo de espacio',
-                  variant: 'destructive'
-                });
-              })
-              .finally(() => {
-                setIsSubmittingType(false);
-              });
-          }}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="typeName" className="text-right">
-                  Nombre
-                </Label>
-                <div className="col-span-3">
-                  <Input
-                    id="typeName"
-                    value={newSpaceType.name}
-                    onChange={(e) => setNewSpaceType({
-                      ...newSpaceType,
-                      name: e.target.value
-                    })}
-                    className={typeFormErrors.name ? 'border-red-500' : ''}
-                    placeholder="Ej: Sala de Reuniones"
-                  />
-                  {typeFormErrors.name && (
-                    <p className="text-xs text-red-500 mt-1">{typeFormErrors.name}</p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="typeDescription" className="text-right">
-                  Descripción
-                </Label>
-                <Input
-                  id="typeDescription"
-                  value={newSpaceType.description}
-                  onChange={(e) => setNewSpaceType({
-                    ...newSpaceType,
-                    description: e.target.value
-                  })}
-                  className="col-span-3"
-                  placeholder="Descripción opcional"
-                />
-              </div>
-              
-              <div className="grid grid-cols-4 items-center gap-4">
-                <div className="text-right">
-                  Opciones
-                </div>
-                <div className="col-span-3 space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="isReservable"
-                      checked={newSpaceType.isReservable}
-                      onChange={(e) => setNewSpaceType({
-                        ...newSpaceType,
-                        isReservable: e.target.checked
-                      })}
-                      className="rounded"
-                    />
-                    <Label htmlFor="isReservable" className="cursor-pointer">
-                      Es reservable
-                    </Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="isAssignable"
-                      checked={newSpaceType.isAssignable}
-                      onChange={(e) => setNewSpaceType({
-                        ...newSpaceType,
-                        isAssignable: e.target.checked
-                      })}
-                      className="rounded"
-                    />
-                    <Label htmlFor="isAssignable" className="cursor-pointer">
-                      Es asignable
-                    </Label>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowAddTypeModal(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmittingType}>
-                {isSubmittingType ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {typeToEdit ? 'Actualizando...' : 'Creando...'}
-                  </>
-                ) : (typeToEdit ? 'Actualizar' : 'Crear')}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showSetupWizard} onOpenChange={setShowSetupWizard}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Configuración de espacios</DialogTitle>
-          </DialogHeader>
-          
-          <SpacesSetupWizard 
-            buildingId={user?.buildingId || ''} 
-            onComplete={handleSetupComplete}
-            open={showSetupWizard}
-            onOpenChange={setShowSetupWizard}
-          />
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showGenerateUnitsModal} onOpenChange={setShowGenerateUnitsModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Generar unidades como espacios</DialogTitle>
-            <DialogDescription>
-              Esta acción creará espacios basados en las unidades existentes en el edificio.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Contenido del modal */}
-          
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGenerateUnitsModal(false)}>
-              Cancelar
-            </Button>
-            <Button>
-              Generar espacios
+            <Button variant="outline" onClick={() => setShowAddSpaceModal(false)}>Cancelar</Button>
+            <Button onClick={handleCreateSpace} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Crear
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
+      {/* Batch Create Modal */}
+      <Dialog open={showBatchCreateModal} onOpenChange={setShowBatchCreateModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Generación Masiva de Unidades</DialogTitle>
+            <DialogDescription>Configura los parámetros para crear múltiples unidades automáticamente.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm border-b pb-2">Configuración</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Cantidad de Pisos</Label>
+                  <Input type="number" value={batchConfig.totalFloors} onChange={e => setBatchConfig({ ...batchConfig, totalFloors: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Unidades por Piso</Label>
+                  <Input type="number" value={batchConfig.unitsPerFloor} onChange={e => setBatchConfig({ ...batchConfig, unitsPerFloor: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Piso Inicial</Label>
+                <Select value={batchConfig.startFloor} onValueChange={v => setBatchConfig({ ...batchConfig, startFloor: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Planta Baja (0)</SelectItem>
+                    <SelectItem value="1">Piso 1</SelectItem>
+                    <SelectItem value="-1">Subsuelo (-1)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Formato de Nomenclatura</Label>
+                <Select value={batchConfig.nomenclature} onValueChange={(v: any) => setBatchConfig({ ...batchConfig, nomenclature: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1A">Piso + Letra (Ej. 1A, 2B)</SelectItem>
+                    <SelectItem value="101">Numérico Hotel (Ej. 101, 201)</SelectItem>
+                    <SelectItem value="A1">Letra + Piso (Ej. A1, B2)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm border-b pb-2 flex justify-between">
+                <span>Vista Previa</span>
+                <Badge variant="secondary">{previewUnits.length} Unidades</Badge>
+              </h4>
+              <div className="bg-slate-50 border rounded-md p-2 h-[200px] overflow-y-auto text-sm space-y-1">
+                {previewUnits.length === 0 ? (
+                  <p className="text-center text-muted-foreground mt-8">Configura los parámetros para ver las unidades generadas.</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    {previewUnits.map((u, i) => (
+                      <div key={i} className="bg-white border rounded px-2 py-1 text-center text-xs shadow-sm">
+                        <span className="font-bold block">{u.name}</span>
+                        <span className="text-slate-500">Piso {u.floor}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBatchCreateModal(false)}>Cancelar</Button>
+            <Button onClick={handleBatchCreate} disabled={isSubmitting || previewUnits.length === 0}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Crear {previewUnits.length} Unidades
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Unit Modal */}
+      <Dialog open={showAddUnitModal} onOpenChange={setShowAddUnitModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva Unidad Funcional</DialogTitle>
+            <DialogDescription>Registra un nuevo departamento.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="unit-name">Identificador de Unidad</Label>
+              <Input
+                id="unit-name"
+                value={newUnit.name}
+                onChange={e => setNewUnit({ ...newUnit, name: e.target.value })}
+                placeholder="Ej. 1A, 4B, PB-2"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="unit-floor">Piso</Label>
+              <Input
+                id="unit-floor"
+                value={newUnit.floor}
+                onChange={e => setNewUnit({ ...newUnit, floor: e.target.value })}
+                placeholder="Ej. 1, 4, PB"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="unit-desc">Descripción / Notas (Opcional)</Label>
+              <Input
+                id="unit-desc"
+                value={newUnit.description}
+                onChange={e => setNewUnit({ ...newUnit, description: e.target.value })}
+                placeholder="Ej. Torre A, Vista al frente"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddUnitModal(false)}>Cancelar</Button>
+            <Button onClick={handleCreateUnit} disabled={isSubmitting || !newUnit.name}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Crear Unidad
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Space Modal */}
       <Dialog open={showEditSpaceModal} onOpenChange={setShowEditSpaceModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar espacio</DialogTitle>
+            <DialogTitle>Editar Espacio</DialogTitle>
+            <DialogDescription>Modifica los detalles del espacio.</DialogDescription>
           </DialogHeader>
-          
-          <form onSubmit={handleSaveEditedSpace}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="editName" className="text-right">
-                  Nombre
-                </Label>
-                <Input
-                  id="editName"
-                  value={spaceToEdit?.name || ''}
-                  onChange={(e) => setSpaceToEdit({
-                    ...spaceToEdit!,
-                    name: e.target.value
-                  })}
-                  className="col-span-3"
-                />
-              </div>
-              
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="editFloor" className="text-right">
-                  Piso
-                </Label>
-                <Input
-                  id="editFloor"
-                  value={spaceToEdit?.floor || ''}
-                  onChange={(e) => setSpaceToEdit({
-                    ...spaceToEdit!,
-                    floor: e.target.value
-                  })}
-                  className="col-span-3"
-                />
-              </div>
-              
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="editDescription" className="text-right">
-                  Descripción
-                </Label>
-                <Input
-                  id="editDescription"
-                  value={spaceToEdit?.description || ''}
-                  onChange={(e) => setSpaceToEdit({
-                    ...spaceToEdit!,
-                    description: e.target.value
-                  })}
-                  className="col-span-3"
-                />
-              </div>
-              
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="editType" className="text-right">
-                  Tipo
-                </Label>
-                <Select 
-                  value={spaceToEdit?.type.id || ''}
-                  onValueChange={(value) => {
-                    const selectedType = spaceTypes.find(type => type.id === value);
-                    setSpaceToEdit({
-                      ...spaceToEdit!,
-                      type: {
-                        id: value,
-                        name: selectedType?.name || '',
-                        isReservable: selectedType?.isReservable || false,
-                        isAssignable: selectedType?.isAssignable || false
-                      }
-                    });
-                  }}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Seleccionar tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {spaceTypes.map(type => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-name">Nombre</Label>
+              <Input id="edit-name" value={newSpace.name} onChange={e => setNewSpace({ ...newSpace, name: e.target.value })} />
             </div>
-            
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowEditSpaceModal(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmittingSpace}>
-                {isSubmittingSpace ? 'Guardando...' : 'Guardar cambios'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showDeleteConfirmModal} onOpenChange={setShowDeleteConfirmModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Confirmar eliminación</DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de que deseas eliminar el espacio "{spaceToDelete?.name}"?
-              Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteConfirmModal(false)} type="button">
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={confirmDeleteSpace} disabled={isDeleting}>
-              {isDeleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Eliminando...
-                </>
-              ) : (
-                'Eliminar'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={showManageTypesModal} onOpenChange={setShowManageTypesModal}>
-        <DialogContent className="sm:max-w-[800px]">
-          <DialogHeader>
-            <DialogTitle>Tipos de espacios</DialogTitle>
-            <DialogDescription>
-              Administra los tipos de espacios disponibles en el edificio
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            {spaceTypes.length === 0 ? (
-              <div className="text-center p-4 text-muted-foreground">
-                No hay tipos de espacios definidos aún.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[200px]">Nombre</TableHead>
-                      <TableHead>Descripción</TableHead>
-                      <TableHead className="w-[120px]">Reservable</TableHead>
-                      <TableHead className="w-[120px]">Asignable</TableHead>
-                      <TableHead className="w-[100px]">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {spaceTypes.map(type => (
-                      <TableRow key={type.id}>
-                        <TableCell className="font-medium">{type.name}</TableCell>
-                        <TableCell>{type.description || '-'}</TableCell>
-                        <TableCell>{type.isReservable ? 'Sí' : 'No'}</TableCell>
-                        <TableCell>{type.isAssignable ? 'Sí' : 'No'}</TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handleEditSpaceType(type)}
-                              title="Editar"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handleDeleteSpaceType(type)}
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setShowManageTypesModal(false)}>
-              Cerrar
-            </Button>
-            <Button onClick={() => {
-              setShowManageTypesModal(false);
-              setShowAddTypeModal(true);
-            }}>
-              Crear nuevo tipo
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Modal de confirmación de eliminación de tipo */}
-      <Dialog open={showDeleteTypeConfirmModal} onOpenChange={setShowDeleteTypeConfirmModal}>
-        <DialogContent className="sm:max-w-[450px]">
-          <DialogHeader>
-            <DialogTitle>Confirmar Eliminación</DialogTitle>
-            <DialogDescription>
-              ¿Estás seguro de que deseas eliminar el tipo de espacio "{typeToDelete?.name}"?
-              Esta acción no se puede deshacer.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 mb-4 p-4 bg-red-50 rounded-md text-red-700 text-sm">
-            <p>Nota: Si hay espacios asociados a este tipo, no podrá ser eliminado.</p>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-type">Tipo</Label>
+              <Select value={newSpace.typeId} onValueChange={val => setNewSpace({ ...newSpace, typeId: val })}>
+                <SelectTrigger><SelectValue placeholder="Selecciona el tipo" /></SelectTrigger>
+                <SelectContent>
+                  {spaceTypes.filter(t => t.isActive).map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-floor">Piso</Label>
+              <Input id="edit-floor" value={newSpace.floor} onChange={e => setNewSpace({ ...newSpace, floor: e.target.value })} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-desc">Descripción</Label>
+              <Input id="edit-desc" value={newSpace.description} onChange={e => setNewSpace({ ...newSpace, description: e.target.value })} />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteTypeConfirmModal(false)} type="button">
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={confirmDeleteSpaceType} disabled={isDeletingType}>
-              {isDeletingType ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Eliminando...
-                </>
-              ) : (
-                'Eliminar'
-              )}
-            </Button>
+            <Button variant="outline" onClick={() => setShowEditSpaceModal(false)}>Cancelar</Button>
+            <Button onClick={handleUpdateSpace} disabled={isSubmitting}>Guardar cambios</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      {/* Modal para asignar propietario a un espacio */}
-      <Dialog open={showAddOwnerModal} onOpenChange={setShowAddOwnerModal}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Asignar Propietario</DialogTitle>
-            <DialogDescription>
-              {currentSpaceForOwner && (
-                <>Asignar propietario a {currentSpaceForOwner.name} ({currentSpaceForOwner.type.name})</>  
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleSaveOwnerAssignment} className="space-y-4 mt-4">
-            {loadingOwners ? (
-              <div className="flex justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : owners.length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground">
-                No se encontraron propietarios registrados.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ownerId">Seleccionar propietario</Label>
-                  <Select 
-                    value={selectedOwnerId}
-                    onValueChange={setSelectedOwnerId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar propietario" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {owners.map(owner => (
-                        <SelectItem key={owner.id} value={owner.id}>
-                          {owner.firstName} {owner.lastName} ({owner.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Switch 
-                    id="isMain" 
-                    checked={isMainOwner}
-                    onCheckedChange={setIsMainOwner}
-                  />
-                  <Label htmlFor="isMain">Propietario principal</Label>
-                </div>
-                
-                <div className="text-sm text-muted-foreground">
-                  <p>El propietario principal será el responsable principal de la unidad y recibirá las notificaciones importantes.</p>
-                </div>
-              </div>
-            )}
-            
-            <DialogFooter className="pt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowAddOwnerModal(false)} 
-                type="button"
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={!selectedOwnerId || assigningOwner || loadingOwners}
-              >
-                {assigningOwner ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Asignando...
-                  </>
-                ) : (
-                  'Guardar'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Diálogo de confirmación para desvincular propietario */}
-      <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+
+      {/* Delete Confirm Modal */}
+      <AlertDialog open={showDeleteConfirmModal} onOpenChange={setShowDeleteConfirmModal}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar desvinculación</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Está seguro que desea desvincular este propietario
-              {ownerToRemove?.isMain ? ' principal' : ''}?
-            </AlertDialogDescription>
+            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer. Eliminará permanentemente el espacio.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRemoveOwner}>Aceptar</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteSpace} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+
+      {/* Manage Types Modal */}
+      <Dialog open={showManageTypesModal} onOpenChange={setShowManageTypesModal}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Gestionar Tipos de Espacios</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className={`p-4 rounded-md space-y-3 border ${typeToEdit ? 'bg-blue-50 border-blue-100' : 'bg-slate-50'}`}>
+              <div className="flex justify-between items-center">
+                <h4 className="text-sm font-medium">{typeToEdit ? 'Editar Tipo' : 'Nuevo Tipo'}</h4>
+                {typeToEdit && (
+                  <Button variant="ghost" size="sm" onClick={cancelEditType}><X className="h-4 w-4" /></Button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder="Nombre" value={newSpaceType.name} onChange={e => setNewSpaceType({ ...newSpaceType, name: e.target.value })} />
+                <Input placeholder="Descripción" value={newSpaceType.description} onChange={e => setNewSpaceType({ ...newSpaceType, description: e.target.value })} />
+              </div>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <Switch checked={newSpaceType.isReservable} onCheckedChange={checked => setNewSpaceType({ ...newSpaceType, isReservable: checked })} />
+                  <Label className="text-xs">Reservable</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={newSpaceType.isAssignable} onCheckedChange={checked => setNewSpaceType({ ...newSpaceType, isAssignable: checked })} />
+                  <Label className="text-xs">Asignable (Cochera/Unidad)</Label>
+                </div>
+              </div>
+              <Button size="sm" onClick={typeToEdit ? handleUpdateType : handleCreateType} disabled={isSubmitting || !newSpaceType.name}>
+                {isSubmitting ? "Guardando..." : (typeToEdit ? "Actualizar Tipo" : "Agregar Tipo")}
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Tipos Existentes</h4>
+              <div className="border rounded-md divide-y max-h-[300px] overflow-y-auto">
+                {spaceTypes.filter(t => t.name !== 'Unidad').map(type => (
+                  <div key={type.id} className={`p-3 flex justify-between items-center text-sm ${!type.isActive ? 'bg-gray-50 opacity-60' : ''}`}>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{type.name}</span>
+                        {!type.isActive && <Badge variant="outline" className="text-[10px] h-4">Inactivo</Badge>}
+                      </div>
+                      <div className="text-muted-foreground text-xs">{type.description}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {type.isReservable && <Badge variant="secondary" className="text-[10px]">Reservable</Badge>}
+
+                      <div className="flex items-center gap-1 border-l pl-2 ml-2">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditType(type)}>
+                          <Edit className="h-3.5 w-3.5 text-slate-500" />
+                        </Button>
+                        <Switch
+                          checked={type.isActive}
+                          onCheckedChange={() => handleToggleTypeStatus(type)}
+                          className="scale-75"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div >
   );
 }

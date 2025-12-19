@@ -16,7 +16,7 @@ export function Layout({
     <div className="flex h-screen bg-background">
       <aside
         className={cn(
-          "border-r bg-gray-50/40 transition-all duration-300",
+          "transition-all duration-300",
           isSidebarOpen ? "w-72" : "w-0 overflow-hidden"
         )}
       >

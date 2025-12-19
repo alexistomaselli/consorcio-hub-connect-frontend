@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "../components/ui/card";
@@ -39,11 +40,11 @@ export default function Profile() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState<number>(1);
-  
+
   const [formData, setFormData] = useState<FormData>({
     basicInfo: {
-      buildingName: currentUser?.managedBuildings?.[0]?.name || '',
-      address: currentUser?.managedBuildings?.[0]?.address || ''
+      buildingName: currentUser?.managedBuildings?.[0]?.name || currentUser?.user_metadata?.building?.name || '',
+      address: currentUser?.managedBuildings?.[0]?.address || currentUser?.user_metadata?.building?.address || ''
     },
     characteristics: {
       floors: currentUser?.managedBuildings?.[0]?.floors?.toString() || '',
@@ -67,64 +68,89 @@ export default function Profile() {
   const onSubmit = async () => {
     try {
       setIsSubmitting(true);
-      
-      // Enviar los datos al endpoint /profile/complete
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/profile/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          buildingName: formData.basicInfo.buildingName,
-          address: formData.basicInfo.address,
-          floors: formData.characteristics.floors,
-          totalUnits: formData.characteristics.totalUnits,
-          constructionYear: formData.characteristics.constructionYear,
-          phoneNumber: formData.contact.phoneNumber,
-          whatsapp: formData.contact.whatsapp,
-          email: formData.contact.email,
-          website: formData.contact.website,
-          description: formData.contact.description,
-          adminFirstName: formData.admin.adminFirstName,
-          adminLastName: formData.admin.adminLastName,
-          adminPhone: formData.admin.adminPhone
-        })
-      });
+      const buildingId = currentUser?.buildingId;
 
-      if (!response.ok) {
-        throw new Error('Error al completar el perfil');
+      if (!buildingId) {
+        throw new Error('No se encontró el ID del edificio');
       }
 
-      // Actualizar el usuario local con los nuevos datos
-      const data = await response.json();
-      await updateUser({
-        ...currentUser,
-        ...data.user,
-        buildingId: data.building.id,
-        buildingName: data.building.name,
-        isProfileComplete: true,
-        managedBuildings: [
-          {
-            ...data.building,
-            floors: parseInt(data.building.floors),
-            totalUnits: parseInt(data.building.totalUnits),
-            constructionYear: data.building.constructionYear ? parseInt(data.building.constructionYear) : undefined
+      // 1. Actualizar datos del edificio
+      const { error: buildingError } = await supabase
+        .from('buildings')
+        .update({
+          name: formData.basicInfo.buildingName,
+          address: formData.basicInfo.address,
+          floors: parseInt(formData.characteristics.floors || '0'),
+          totalUnits: parseInt(formData.characteristics.totalUnits || '0'),
+          constructionYear: formData.characteristics.constructionYear ? parseInt(formData.characteristics.constructionYear) : null,
+          isProfileComplete: true,
+          updatedAt: new Date().toISOString()
+        })
+        .eq('id', buildingId);
+
+      if (buildingError) throw buildingError;
+
+      // 2. Actualizar datos públicos del usuario (public.users)
+      const { error: userError } = await supabase
+        .from('users')
+        .update({
+          firstName: formData.admin.adminFirstName,
+          lastName: formData.admin.adminLastName,
+          isProfileComplete: true,
+          updatedAt: new Date().toISOString()
+        })
+        .eq('id', currentUser?.id);
+
+      if (userError) throw userError;
+
+      // 3. Actualizar metadata de autenticación (auth.users)
+      const { data: { user }, error: authError } = await supabase.auth.updateUser({
+        data: {
+          firstName: formData.admin.adminFirstName,
+          lastName: formData.admin.adminLastName,
+          isProfileComplete: true,
+          building: {
+            name: formData.basicInfo.buildingName,
+            address: formData.basicInfo.address
           }
-        ]
+        }
       });
+
+      if (authError) throw authError;
+
+      // 4. Actualizar estado local
+      if (user) {
+        await updateUser({
+          firstName: formData.admin.adminFirstName,
+          lastName: formData.admin.adminLastName,
+          isProfileComplete: true,
+          buildingName: formData.basicInfo.buildingName,
+          managedBuildings: currentUser?.managedBuildings?.map(b =>
+            b.id === buildingId
+              ? {
+                ...b,
+                name: formData.basicInfo.buildingName,
+                address: formData.basicInfo.address,
+                floors: parseInt(formData.characteristics.floors),
+                totalUnits: parseInt(formData.characteristics.totalUnits),
+                constructionYear: formData.characteristics.constructionYear ? parseInt(formData.characteristics.constructionYear) : undefined
+              }
+              : b
+          )
+        });
+      }
 
       toast({
         title: "¡Perfil completado!",
         description: "Ya puedes comenzar a gestionar los reclamos de tu consorcio."
       });
-      
+
       navigate('/settings/building');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
       toast({
         title: "Error",
-        description: "Hubo un error al actualizar la información. Por favor, intente nuevamente.",
+        description: error.message || "Hubo un error al actualizar la información. Por favor, intente nuevamente.",
         variant: "destructive"
       });
     } finally {
@@ -175,10 +201,10 @@ export default function Profile() {
         }
         break;
       case 3:
-        if (!data.phoneNumber || !data.whatsapp || !data.email) {
+        if (!data.email) {
           toast({
             title: "Error",
-            description: "Por favor complete todos los campos requeridos.",
+            description: "Por favor complete el email, es requerido.",
             variant: "destructive"
           });
           isValid = false;
@@ -271,7 +297,7 @@ export default function Profile() {
       case 2:
         return "Características del Edificio";
       case 3:
-        return "Información de Contacto";
+        return "Contacto del Edificio";
       case 4:
         return "Información del Administrador";
       default:
@@ -282,11 +308,11 @@ export default function Profile() {
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
-        return <StepBasicInfo 
+        return <StepBasicInfo
           defaultValues={{
-            buildingName: currentUser?.managedBuildings?.[0]?.name || formData.basicInfo.buildingName || '',
-            address: currentUser?.managedBuildings?.[0]?.address || formData.basicInfo.address || ''
-          }} 
+            buildingName: currentUser?.managedBuildings?.[0]?.name || currentUser?.user_metadata?.building?.name || formData.basicInfo.buildingName || '',
+            address: currentUser?.managedBuildings?.[0]?.address || currentUser?.user_metadata?.building?.address || formData.basicInfo.address || ''
+          }}
           onSubmit={(data) => {
             setFormData(prev => ({
               ...prev,
@@ -298,7 +324,7 @@ export default function Profile() {
           }}
         />;
       case 2:
-        return <StepCharacteristics 
+        return <StepCharacteristics
           defaultValues={formData.characteristics}
           onSubmit={(data) => {
             setFormData(prev => ({
@@ -312,7 +338,7 @@ export default function Profile() {
           }}
         />;
       case 3:
-        return <StepContact 
+        return <StepContact
           defaultValues={formData.contact}
           onSubmit={(data) => {
             setFormData(prev => ({
@@ -328,7 +354,7 @@ export default function Profile() {
           }}
         />;
       case 4:
-        return <StepAdmin 
+        return <StepAdmin
           defaultValues={formData.admin}
           onSubmit={(data) => {
             setFormData(prev => ({

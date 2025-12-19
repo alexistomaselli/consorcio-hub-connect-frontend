@@ -4,7 +4,7 @@ import { WhatsAppConfig } from '@/components/Settings/WhatsAppConfig';
 import { Building } from '@/types';
 import { WhatsAppInstance } from '@/types/whatsapp';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 
 
@@ -12,24 +12,15 @@ import { api } from '@/lib/api';
 
 export default function BuildingSettings() {
   console.log('Rendering BuildingSettings component');
-  const { currentUser, getAuthHeaders } = useAuth();
-  const token = localStorage.getItem('token');
-
-  console.log('Current user:', {
-    id: currentUser?.id,
-    role: currentUser?.role,
-    buildingId: currentUser?.buildingId,
-    buildingName: currentUser?.buildingName
-  });
-  
-  // Si no hay usuario, token o buildingId, mostrar error
-  if (!currentUser || !token) {
+  const { currentUser } = useAuth();
+  // Si no hay usuario, mostrar error
+  if (!currentUser) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center space-y-4">
           <p className="text-red-600 font-medium">Error de autenticación</p>
           <p className="text-sm text-gray-500">
-            {!currentUser ? 'No hay usuario autenticado' : 'La sesión ha expirado'}
+            No hay usuario autenticado
           </p>
         </div>
       </div>
@@ -54,13 +45,17 @@ export default function BuildingSettings() {
   const { data: building, isLoading: buildingLoading } = useQuery<Building>({
     queryKey: ['building', buildingId],
     queryFn: async () => {
-      try {
-        const response = await api.get<Building>(`/buildings/${buildingId}`);
-        return response.data;
-      } catch (error) {
+      const { data, error } = await supabase
+        .from('buildings')
+        .select('*')
+        .eq('id', buildingId)
+        .single();
+
+      if (error) {
         console.error('Error al cargar el edificio:', error);
-        throw new Error('Error al cargar el edificio');
+        throw error;
       }
+      return data;
     },
     enabled: !!buildingId,
   });
@@ -69,22 +64,31 @@ export default function BuildingSettings() {
     queryKey: ['whatsapp', buildingId],
     queryFn: async () => {
       console.log('Fetching WhatsApp instance:', buildingId);
-      try {
-        const response = await api.get<{ success: boolean; data: WhatsAppInstance | null; message: string }>(
-          `/buildings/whatsapp/${buildingId}`
-        );
-        
-        console.log('API Response:', {
-          status: response.status,
-          statusText: response.statusText
-        });
-        
-        console.log('WhatsApp instance data:', response.data);
-        return response.data;
-      } catch (error: any) {
-        console.error('API request error:', error);
-        throw new Error(`Error al cargar la instancia de WhatsApp: ${error.message}`);
+      const { data, error } = await supabase
+        .from('buildings')
+        .select('whatsapp')
+        .eq('id', buildingId)
+        .single();
+
+      if (error) {
+        console.error('Database request error:', error);
+        throw new Error(`Error al cargar datos de WhatsApp: ${error.message}`);
       }
+
+      let parsedData: WhatsAppInstance | null = null;
+      if (data?.whatsapp) {
+        try {
+          parsedData = JSON.parse(data.whatsapp);
+        } catch (e) {
+          console.error('Error parsing whatsapp data', e);
+        }
+      }
+
+      return {
+        success: true,
+        data: parsedData,
+        message: 'Loaded from Supabase'
+      };
     },
     enabled: !!buildingId,
   });
@@ -105,8 +109,8 @@ export default function BuildingSettings() {
     console.error('Error loading building:', error);
     return (
       <div className="container mx-auto py-6 space-y-6">
-        <h1 className="text-2xl font-bold">Configuración del Consorcioooo</h1>
-        
+        <h1 className="text-2xl font-bold">Configuración del Consorcio</h1>
+
         <div className="grid gap-6 md:grid-cols-2">
           {/* Configuración de WhatsApp */}
           <WhatsAppConfig
@@ -125,7 +129,7 @@ export default function BuildingSettings() {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <h1 className="text-2xl font-bold">Configuración del Consorcio</h1>
-      
+
       <div className="grid gap-6 md:grid-cols-2">
         {/* Configuración de WhatsApp */}
         <WhatsAppConfig

@@ -33,6 +33,7 @@ import Spaces from "./pages/Spaces";
 import OwnerUnit from "./pages/OwnerUnit";
 import NotFound from "./pages/NotFound";
 import Unauthorized from "./pages/Unauthorized";
+import SystemSettings from './pages/admin/SystemSettings';
 
 const queryClient = new QueryClient();
 
@@ -46,19 +47,17 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               {/* Rutas públicas */}
-              <Route element={<MainLayout />}>
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/register-user" element={<RegisterUser />} />
-                <Route path="/register/owner/:token" element={<RegisterOwner />} />
-                <Route path="/owners/verify/:token" element={<RegisterOwner />} />
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/register-user" element={<RegisterUser />} />
+              <Route path="/register/owner/:token" element={<RegisterOwner />} />
+              <Route path="/owners/verify/:token" element={<RegisterOwner />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
-              <Route path="/verify-email" element={
-                <ProtectedRoute>
-                  <VerifyEmail />
-                </ProtectedRoute>
-              } />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+
+              <Route element={<MainLayout />}>
+                {/* Empty layout wrapper if reused later, or remove if MainLayout was only for these */}
               </Route>
 
               {/* Rutas protegidas */}

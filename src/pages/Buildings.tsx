@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { Building } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Plus, Search } from 'lucide-react';
@@ -9,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from '@/components/ui/input';
 
 export default function Buildings() {
-  const { getAuthHeaders } = useAuth();
+  const { } = useAuth();
   const { toast } = useToast();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [loadingBuildings, setLoadingBuildings] = useState(true);
@@ -19,14 +20,14 @@ export default function Buildings() {
   const fetchBuildings = async () => {
     try {
       setLoadingBuildings(true);
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/buildings`, {
-        headers: getAuthHeaders()
-      });
+      const { data, error } = await supabase
+        .from('buildings')
+        .select('*, admin:users!adminId(id, firstName, lastName, email), plan:plans!planId(id, name)')
+        .order('name');
 
-      if (!response.ok) throw new Error('Error al cargar los edificios');
+      if (error) throw error;
 
-      const data = await response.json();
-      setBuildings(data);
+      setBuildings(data || []);
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -105,20 +106,20 @@ export default function Buildings() {
             <AlertDialogAction
               onClick={async () => {
                 if (!buildingToDelete) return;
-                
-                try {
-                  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/buildings/${buildingToDelete.id}`, {
-                    method: 'DELETE',
-                    headers: getAuthHeaders(),
-                  });
 
-                  if (!response.ok) throw new Error('Error al eliminar el edificio');
-                  
+                try {
+                  const { error } = await supabase
+                    .from('buildings')
+                    .delete()
+                    .eq('id', buildingToDelete.id);
+
+                  if (error) throw error;
+
                   toast({
                     title: "Éxito",
                     description: "Edificio eliminado correctamente",
                   });
-                  
+
                   // Actualizar la lista de edificios
                   fetchBuildings();
                 } catch (error) {

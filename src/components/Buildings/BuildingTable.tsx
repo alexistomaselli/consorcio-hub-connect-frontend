@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Building } from "@/types";
 import { Pencil, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 
 const getInitials = (firstName?: string, lastName?: string) => {
   if (!firstName || !lastName) return '';
@@ -39,7 +40,9 @@ export function BuildingTable({ buildings, onEdit, onDelete }: BuildingTableProp
               <th className="h-12 px-4 text-left align-middle font-medium">Nombre</th>
               <th className="h-12 px-4 text-left align-middle font-medium">Dirección</th>
               <th className="h-12 px-4 text-left align-middle font-medium">Ciudad</th>
-              <th className="h-12 px-4 text-left align-middle font-medium">Estado</th>
+              <th className="h-12 px-4 text-left align-middle font-medium">Provincia</th>
+              <th className="h-12 px-4 text-left align-middle font-medium">Plan</th>
+              <th className="h-12 px-4 text-left align-middle font-medium">Estatus</th>
               <th className="h-12 px-4 text-left align-middle font-medium">Acciones</th>
             </tr>
           </thead>
@@ -51,25 +54,43 @@ export function BuildingTable({ buildings, onEdit, onDelete }: BuildingTableProp
               >
                 <td className="p-4 align-middle">
                   <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback className={getRandomColor()}>
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className={`${getRandomColor()} text-white text-xs`}>
                         {getInitials(building.admin?.firstName, building.admin?.lastName)}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
-                      <div className="font-medium">
-                        {building.admin?.firstName} {building.admin?.lastName}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {building.admin?.email}
-                      </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">
+                        {building.admin?.firstName ? `${building.admin.firstName} ${building.admin.lastName}` : 'Sin asignar'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {building.admin?.email || '-'}
+                      </span>
                     </div>
                   </div>
                 </td>
-                <td className="p-4 align-middle">{building.name}</td>
-                <td className="p-4 align-middle">{building.address}</td>
-                <td className="p-4 align-middle">{building.city}</td>
-                <td className="p-4 align-middle">{building.state}</td>
+                <td className="p-4 align-middle font-medium">{building.name}</td>
+                <td className="p-4 align-middle">{building.address || '-'}</td>
+                <td className="p-4 align-middle">{building.city || '-'}</td>
+                <td className="p-4 align-middle">{building.state || '-'}</td>
+                <td className="p-4 align-middle">
+                  {building.plan?.name ? (
+                    <Badge variant="outline" className="text-xs font-normal">
+                      {building.plan.name}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">-</span>
+                  )}
+                </td>
+                <td className="p-4 align-middle">
+                  <Badge
+                    variant={building.status === 'ACTIVE' ? 'default' : 'secondary'}
+                    className={building.status === 'ACTIVE' ? 'bg-green-500 hover:bg-green-600' : ''}
+                  >
+                    {building.status === 'ACTIVE' ? 'Activo' :
+                      building.status === 'PENDING' ? 'Pendiente' : 'Inactivo'}
+                  </Badge>
+                </td>
                 <td className="p-4 align-middle">
                   <div className="flex gap-2">
                     {onEdit && (
@@ -77,6 +98,7 @@ export function BuildingTable({ buildings, onEdit, onDelete }: BuildingTableProp
                         variant="ghost"
                         size="icon"
                         onClick={() => onEdit(building)}
+                        className="h-8 w-8"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -86,6 +108,7 @@ export function BuildingTable({ buildings, onEdit, onDelete }: BuildingTableProp
                         variant="ghost"
                         size="icon"
                         onClick={() => onDelete(building)}
+                        className="h-8 w-8 text-destructive hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
