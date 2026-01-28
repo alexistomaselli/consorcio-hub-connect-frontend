@@ -8,9 +8,9 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from 'sonner';
-import { useN8nWebhook } from '@/hooks/useN8nWebhook';
 import { ExistingInstance } from './ExistingInstance';
-import { api } from '@/lib/api'; // Importar el cliente API centralizado
+import { evolutionService } from '@/services/evolution';
+import { supabase } from '@/lib/supabase';
 
 import { WhatsAppInstance, WhatsAppInstanceResponse, WhatsappStatus } from "@/types/whatsapp";
 
@@ -22,23 +22,13 @@ type WhatsAppConfigProps = {
 export function WhatsAppConfig({ buildingId, whatsapp: initialWhatsapp }: WhatsAppConfigProps): JSX.Element {
   const queryClient = useQueryClient();
 
-  // Obtener los webhooks necesarios
-  const { data: connectWebhook, isLoading: isLoadingConnectWebhook, error: connectWebhookError } = useN8nWebhook('whatsapp_connect');
-  const { data: deleteWebhook, isLoading: isLoadingDeleteWebhook, error: deleteWebhookError } = useN8nWebhook('whatsapp_delete_instance');
-  const { data: statusWebhook } = useN8nWebhook('whatsapp_get_status');
+  // No more webhooks
+  const isLoadingConnectWebhook = false;
+  const connectWebhookError = null;
+  const isLoadingDeleteWebhook = false;
+  const deleteWebhookError = null;
 
-  // Limpiar error cuando se carga el webhook
-  useEffect(() => {
-    if (!isLoadingConnectWebhook && connectWebhook?.data?.data?.prodUrl) {
-      setError(null);
-    }
-  }, [isLoadingConnectWebhook, connectWebhook]);
-
-  // Constantes para los intervalos de polling
-  const NORMAL_POLLING_INTERVAL = 120000; // 2 minutos
-  const ACTIVE_POLLING_INTERVAL = 5000;   // 5 segundos - más frecuente para QR
-
-  // Estados locales
+  // Local state
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [whatsappData, setWhatsappData] = useState<WhatsAppInstance | null>(null);
@@ -47,161 +37,80 @@ export function WhatsAppConfig({ buildingId, whatsapp: initialWhatsapp }: WhatsA
   const [isLoading, setIsLoading] = useState(false);
   const [isActivePolling, setIsActivePolling] = useState(false);
   const [isNewInstance, setIsNewInstance] = useState(false);
-  
-  // Forzar una verificación de estado al cargar el componente
-  useEffect(() => {
-    console.log('WhatsAppConfig mounted - Verificando estado inicial...');
-    if (buildingId) {
-      const initialCheck = setTimeout(() => {
-        refetchStatus?.();
-        refetchInstance?.();
-      }, 1000);
-      
-      return () => clearTimeout(initialCheck);
-    }
-  }, [buildingId]);
 
-
-
-  // Manejar errores de los webhooks
-  useEffect(() => {
-    if (connectWebhookError) {
-      setError('Error al obtener el webhook de conexión');
-      console.error('Error en webhook de conexión:', connectWebhookError);
-    }
-  }, [connectWebhookError]);
-
-  useEffect(() => {
-    if (deleteWebhookError) {
-      setError('Error al obtener el webhook de eliminación');
-      console.error('Error en webhook de eliminación:', deleteWebhookError);
-    }
-  }, [deleteWebhookError]);
-
-  // Debug webhooks
-  useEffect(() => {
-    console.log('Estado del webhook de conexión:', {
-      isLoading: isLoadingConnectWebhook,
-      error: connectWebhookError,
-      webhook: connectWebhook,
-      webhookUrl: connectWebhook?.data?.data?.prodUrl
-    });
-  }, [connectWebhook, isLoadingConnectWebhook, connectWebhookError]);
-
-  // Debug webhooks
-  useEffect(() => {
-    console.log('Estado del webhook de eliminación:', {
-      isLoading: isLoadingDeleteWebhook,
-      error: deleteWebhookError,
-      webhook: deleteWebhook
-    });
-  }, [deleteWebhook, isLoadingDeleteWebhook, deleteWebhookError]);
-
-  // 1. Primero, obtener la información de la instancia
-  const { data: whatsappInstance, isLoading: isLoadingInstance, error: instanceError, refetch: refetchInstance } = useQuery<WhatsAppInstanceResponse, Error>({
+  // 1. Fetch current building data (including whatsapp JSON)
+  const { data: buildingDataResponse, isLoading: isLoadingInstance, refetch: refetchInstance } = useQuery({
     queryKey: ['whatsapp-instance', buildingId],
-    queryFn: async (): Promise<WhatsAppInstanceResponse> => {
-      // Usar el cliente API centralizado en lugar de fetch directo
-      const response = await api.get<WhatsAppInstanceResponse>(`/buildings/whatsapp/${buildingId}`);
-      
-      const responseData: WhatsAppInstanceResponse = response.data;
-      console.log('[WhatsApp Instance Check]', {
-        buildingId,
-        instance: responseData.data,
-        timestamp: new Date().toISOString()
-      });
-      return responseData; // Retornamos la respuesta completa
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('buildings')
+        .select('whatsapp, name')
+        .eq('id', buildingId)
+        .single();
+
+      if (error) throw error;
+
+      let parsedWhatsapp: WhatsAppInstance | null = null;
+      if (data?.whatsapp) {
+        try {
+          parsedWhatsapp = typeof data.whatsapp === 'string' ? JSON.parse(data.whatsapp) : data.whatsapp;
+        } catch (e) {
+          console.error('Error parsing whatsapp data', e);
+        }
+      }
+      return { data: parsedWhatsapp, buildingName: data?.name };
     },
-    // La información de la instancia se refresca cuando cambia el estado
-    staleTime: 0,
-    refetchInterval: isActivePolling ? 5000 : 60000 // Más frecuente en modo activo (5s) y cada minuto en modo normal
+    enabled: !!buildingId,
   });
 
-  // 2. Query para el estado de WhatsApp usando el endpoint directo en lugar del webhook
-  const { data: statusData, isLoading: statusLoading, refetch: refetchStatus } = useQuery<{ success: boolean, data: WhatsAppInstance }, Error>({
+  // 2. Query for real-time status from Evolution API
+  const { data: statusData, isLoading: statusLoading, refetch: refetchStatus } = useQuery({
     queryKey: ['whatsapp-status', buildingId],
     queryFn: async () => {
-      if (!buildingId) {
-        // Incluso si no tenemos whatsappInstance aún, consultamos el estado para detectar cuando se crea
-        console.log('[WhatsApp Status Check] No hay instancia local, pero consultando de todas formas');
-        return { success: false, data: { status: 'DISCONNECTED' } as WhatsAppInstance };
-      }
+      if (!whatsappData?.instanceName) return null;
 
       try {
-        // Usar el endpoint directo de la API en lugar del webhook
-        console.log(`[WhatsApp Status Check] Consultando estado para ${buildingId}...`);
-        const response = await api.get<{ success: boolean, data: WhatsAppInstance, message: string }>(
-          `/buildings/whatsapp/status/${buildingId}`
-        );
+        const response = await evolutionService.getInstanceStatus(whatsappData.instanceName);
+        const state = response.instance?.state;
 
-        if (!response.data.success || !response.data.data) {
-          console.log('[WhatsApp Status Check] Respuesta sin éxito:', response.data);
-          return { success: false, data: { status: 'DISCONNECTED' } as WhatsAppInstance };
-        }
+        const isConnected = state === 'open';
 
-        const data = response.data;
-        console.log('[WhatsApp Status Check] Estado actual:', {
-          buildingId,
-          instanceName: data.data.instanceName,
-          status: data.data.status,
-          evolutionApiStatus: data.data.evolutionApiStatus,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Si la instancia está CONNECTED, cambiar a polling normal
-        // Si está DISCONNECTED, usar polling rápido
-        // Esto garantiza que detectemos los cambios rápidamente
-        const isConnected = data.data.status === 'CONNECTED';
-        
         if (isConnected && isActivePolling) {
-          console.log('[WhatsApp Status Check] Cambiando a polling normal (dispositivo conectado)');
           setIsActivePolling(false);
         } else if (!isConnected && !isActivePolling) {
-          console.log('[WhatsApp Status Check] Cambiando a polling activo (dispositivo desconectado)');
           setIsActivePolling(true);
         }
-        
-        // Si hay un código QR activo y el estado es CONNECTED, significa que se escaneó exitosamente
+
         if (isConnected && qrCode) {
-          console.log('[WhatsApp Status Check] Dispositivo vinculado correctamente - QR escaneado');
           setQrCode(null);
           setTimeLeft(null);
           toast.success('¡Dispositivo vinculado correctamente!');
+          // Update Supabase state
+          await evolutionService.updateBuildingWhatsapp(buildingId, {
+            ...whatsappData,
+            status: 'CONNECTED'
+          });
+          refetchInstance();
         }
-        
-        // Actualizar el estado local si es diferente
-        if (whatsappData?.status !== data.data.status) {
-          console.log(`[WhatsApp Status Check] Actualizando estado local: ${whatsappData?.status || 'null'} -> ${data.data.status}`);
-          // Actualizar inmediatamente el estado local para mejor UX
-          setWhatsappData(prevData => ({
-            ...prevData,
-            ...data.data
-          }));
-        }
-        
-        return data;
+
+        return response;
       } catch (error) {
-        console.error('[WhatsApp Status Check] Error:', error);
-        return { success: false, data: { status: 'DISCONNECTED' } as WhatsAppInstance };
+        console.error('Status check error:', error);
+        return null;
       }
     },
-    // SIEMPRE habilitado si tenemos un buildingId, incluso sin instancia
-    enabled: Boolean(buildingId),
-    // El estado de la conexión necesita ser más fresco cuando estamos en polling activo
-    staleTime: 0, // Siempre consulta la última versión
-    refetchInterval: isActivePolling ? ACTIVE_POLLING_INTERVAL : NORMAL_POLLING_INTERVAL,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true
+    enabled: !!buildingId && !!whatsappData?.instanceName,
+    refetchInterval: isActivePolling ? 5000 : 30000,
   });
 
   const isInstanceLoading = isLoadingInstance || statusLoading;
 
   // Actualizar el estado local cuando cambie la instancia
   useEffect(() => {
-    if (whatsappInstance?.data) {
-      setWhatsappData(whatsappInstance.data);
+    if (buildingDataResponse?.data) {
+      setWhatsappData(buildingDataResponse.data);
     }
-  }, [whatsappInstance?.data]);
+  }, [buildingDataResponse?.data]);
 
   // Ya no necesitamos mapear el estado manualmente ya que la API nos devuelve el estado correcto
   // Esta función se mantiene por compatibilidad con el código existente
@@ -214,16 +123,17 @@ export function WhatsAppConfig({ buildingId, whatsapp: initialWhatsapp }: WhatsA
 
   // Usar el estado más actualizado disponible (preferimos el que viene del endpoint de status)
   const currentWhatsappData = useMemo(() => {
-    if (!whatsappInstance?.data) return null;
-    
-    // Dar prioridad al estado del endpoint /status que es más actualizado
+    if (!buildingDataResponse?.data) return null;
+
+    // Dar prioridad al estado del Evolution API que es más actualizado
+    const evolutionState = statusData?.instance?.state;
+    const mappedStatus: WhatsappStatus = evolutionState === 'open' ? 'CONNECTED' : 'DISCONNECTED';
+
     return {
-      ...whatsappInstance.data,
-      // Si tenemos datos de statusData, usamos su estado que es más actualizado
-      status: statusData?.data?.status || whatsappInstance.data.status,
-      evolutionApiStatus: statusData?.data?.evolutionApiStatus || whatsappInstance.data.evolutionApiStatus
+      ...buildingDataResponse.data,
+      status: mappedStatus,
     };
-  }, [whatsappInstance?.data, statusData?.data]);
+  }, [buildingDataResponse?.data, statusData]);
 
   useEffect(() => {
     if (currentWhatsappData && (!whatsappData || currentWhatsappData.status !== whatsappData.status)) {
@@ -267,64 +177,27 @@ export function WhatsAppConfig({ buildingId, whatsapp: initialWhatsapp }: WhatsA
 
   // Función para obtener el código QR
   const handleGetQr = async (): Promise<void> => {
-    // Activar el polling rápido cuando se intenta vincular
+    if (!whatsappData?.instanceName) return;
+
     setIsActivePolling(true);
-    
-    // Asegurarse de iniciar las verificaciones de estado inmediatamente
     refetchStatus();
-
-    // Debug webhook
-    console.log('Estado del webhook al intentar vincular:', {
-      connectWebhook,
-      data: connectWebhook?.data,
-      innerData: connectWebhook?.data?.data,
-      prodUrl: connectWebhook?.data?.data?.prodUrl
-    });
-
-    if (!connectWebhook?.data?.data?.prodUrl) {
-      setError('No se pudo obtener la URL del webhook');
-      return;
-    }
 
     try {
       setIsGeneratingQr(true);
       setError(null);
 
-      const response = await fetch(connectWebhook.data.data.prodUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          buildingId,
-          instanceName: whatsappData?.instanceName,
-        }),
-      });
+      const response = await evolutionService.getConnectQr(whatsappData.instanceName);
 
-      if (!response.ok) {
-        throw new Error('Error al generar el código QR');
-      }
-
-      const data = await response.json() as QrResponse;
-      if (data.success && data.qr_base64) {
-        setQrCode(data.qr_base64);
-        setTimeLeft(40); // Iniciar el contador en 40 segundos
-        refetchInstance(); // Actualizar el estado de la instancia
-        
-        // Iniciar verificaciones frecuentes del estado mientras el QR está activo
-        const qrStatusCheck = setInterval(() => {
-          console.log('Verificando estado mientras el QR está activo...');
-          refetchStatus();
-        }, 3000); // Verificar cada 3 segundos
-        
-        // Limpiar el intervalo después de 40 segundos (tiempo de vida del QR)
-        setTimeout(() => clearInterval(qrStatusCheck), 41000);
+      if (response.base64) {
+        setQrCode(response.base64);
+        setTimeLeft(40);
+        refetchInstance();
       } else {
         throw new Error('No se pudo generar el código QR');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
-      toast.error(err instanceof Error ? err.message : 'Error desconocido');
+      toast.error('Error al obtener QR: Instancia posiblemente no inicializada correctamente.');
     } finally {
       setIsGeneratingQr(false);
     }
@@ -332,44 +205,39 @@ export function WhatsAppConfig({ buildingId, whatsapp: initialWhatsapp }: WhatsA
 
   // Actualizar el estado de la instancia cuando cambia el status
   useEffect(() => {
-    if (whatsappInstance?.data && statusData?.data?.status) {
-      // Ya no necesitamos convertir el estado porque la API ya lo devuelve en el formato correcto
-      const newStatus = statusData.data.status;
-      if (whatsappInstance.data.status !== newStatus) {
-        // Actualizar el estado local
+    if (buildingDataResponse?.data && statusData?.instance?.state) {
+      const newStatus: WhatsappStatus = statusData.instance.state === 'open' ? 'CONNECTED' : 'DISCONNECTED';
+      if (buildingDataResponse.data.status !== newStatus) {
         setWhatsappData({
-          ...whatsappInstance.data,
+          ...buildingDataResponse.data,
           status: newStatus
         });
       }
     }
-  }, [statusData?.data?.status, whatsappInstance?.data]);
+  }, [statusData, buildingDataResponse?.data]);
 
   // Crear instancia
-  const { mutate: createInstance, isPending: isCreating } = useMutation<WhatsAppInstance, Error>({
+  const { mutate: createInstance, isPending: isCreating } = useMutation({
     mutationFn: async () => {
-      // Logs para depuración
-      console.log('=== DEBUGGING CREATE INSTANCE API CALL ===');
-      console.log('API Base URL:', (api.defaults.baseURL));
-      console.log('Building ID:', buildingId);
-      
-      try {
-        // Usar el cliente API centralizado en lugar de fetch directo
-        const response = await api.post(`/buildings/whatsapp/${buildingId}`);
+      const instanceName = `${buildingDataResponse?.buildingName?.replace(/\s+/g, '_')}_${buildingId}`;
+      const response = await evolutionService.createInstance(instanceName);
 
-        // Log de respuesta
-        console.log('Response status:', response.status);
-        console.log('Response data:', response.data);
-        
-        // Asegúrate de que coincida con el tipo WhatsAppInstance
-        return response.data as WhatsAppInstance;
-      } catch (error) {
-        console.error('API error:', error);
-        throw error;
-      }
+      const newWhatsapp: WhatsAppInstance = {
+        id: crypto.randomUUID(),
+        buildingId,
+        instanceName,
+        status: 'DISCONNECTED',
+        n8nFlowStatus: 'COMPLETED',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        connectionAttempts: 0
+      };
+
+      await evolutionService.updateBuildingWhatsapp(buildingId, newWhatsapp);
+      return newWhatsapp;
     },
     onSuccess: () => {
-      setIsNewInstance(true); // Marcar como instancia nueva
+      setIsNewInstance(true);
       refetchInstance();
       toast.success('Instancia creada correctamente');
     },
@@ -393,62 +261,25 @@ export function WhatsAppConfig({ buildingId, whatsapp: initialWhatsapp }: WhatsA
   }, [whatsappData?.status]);
 
   const handleDelete = async () => {
-    console.log('Debug eliminar instancia:', {
-      webhookUrl: deleteWebhook?.data?.data?.prodUrl,
-      instanceName: whatsappInstance?.data?.instanceName,
-      buildingId
-    });
-  
-    if (!deleteWebhook?.data?.data?.prodUrl || !whatsappInstance?.data?.instanceName || !buildingId) {
-      toast.error('Error: Faltan datos necesarios para eliminar la instancia');
+    if (!whatsappData?.instanceName || !buildingId) {
+      toast.error('Faltan datos para eliminar la instancia');
       return;
     }
 
     try {
       setIsLoading(true);
-      
-      // 1. Primero eliminar en Evolution API a través de n8n
-      console.log('Eliminando instancia en Evolution API...');
-      const n8nResponse = await fetch(deleteWebhook.data.data.prodUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ instanceName: whatsappInstance.data.instanceName }),
-      });
+      await evolutionService.deleteInstance(whatsappData.instanceName);
+      await evolutionService.updateBuildingWhatsapp(buildingId, null);
 
-      if (!n8nResponse.ok) {
-        throw new Error('Error al eliminar la instancia en Evolution API');
-      }
-
-      const n8nData = await n8nResponse.json();
-      if (!n8nData.success) {
-        throw new Error(n8nData.data?.message || 'Error al eliminar en Evolution API');
-      }
-
-      // 2. Si Evolution API se eliminó correctamente, eliminar de nuestra base de datos
-      console.log('Eliminando instancia de la base de datos...');
-      // Usar el cliente API centralizado en lugar de fetch directo
-      await api.delete(`/buildings/whatsapp/${buildingId}`);
-      
-      // El cliente API ya maneja los errores HTTP automáticamente
-
-      // Actualizar el estado local y la caché
       setWhatsappData(null);
-      queryClient.setQueryData(['whatsapp-instance', buildingId], {
-        success: true,
-        data: null,
-        message: 'No hay instancia configurada'
-      });
-      
-      // Invalidar las queries para forzar una recarga
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-instance', buildingId] });
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-status', buildingId] });
-      
+      queryClient.setQueryData(['whatsapp-instance', buildingId], { data: null });
+      refetchInstance();
+      refetchStatus();
+
       toast.success('Instancia eliminada correctamente');
-    } catch (error) {
-      console.error('Error al eliminar la instancia:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al eliminar la instancia');
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast.error(error.message || 'Error al eliminar');
     } finally {
       setIsLoading(false);
     }
@@ -577,9 +408,9 @@ export function WhatsAppConfig({ buildingId, whatsapp: initialWhatsapp }: WhatsA
 
             {/* Mostrar ExistingInstance solo si hay una instancia en la base de datos */}
             {whatsappData?.id ? (
-              <ExistingInstance 
-                buildingId={buildingId} 
-                instance={whatsappData} 
+              <ExistingInstance
+                buildingId={buildingId}
+                instance={whatsappData}
                 onRefresh={() => {
                   refetchInstance();
                   refetchStatus();

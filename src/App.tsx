@@ -24,8 +24,9 @@ import Profile from './pages/Profile';
 import Buildings from './pages/Buildings';
 import Claims from "./pages/Claims";
 import MyClaims from "./pages/MyClaims";
-// import ClaimDetail from "./pages/ClaimDetail";
+import ClaimDetail from "./pages/ClaimDetail";
 import Owners from "./pages/Owners";
+import Invitations from "./pages/Invitations";
 import { OwnersManagement } from "./pages/OwnersManagement";
 import BuildingSettings from "./pages/Settings/Building";
 import Services from "./pages/Services";
@@ -34,6 +35,7 @@ import OwnerUnit from "./pages/OwnerUnit";
 import NotFound from "./pages/NotFound";
 import Unauthorized from "./pages/Unauthorized";
 import SystemSettings from './pages/admin/SystemSettings';
+import ServiceClaims from './pages/ServiceClaims';
 
 const queryClient = new QueryClient();
 
@@ -99,11 +101,14 @@ const App = () => (
                     </ProtectedRoute>
                   } />
                   <Route path="my-claims" element={<MyClaims />} />
-                  {/* <Route path="claims/:id" element={<ClaimDetail />} /> */}
+                  <Route path="my-claims/:id" element={<ClaimDetail />} />
+                  <Route path="claims/:id" element={<ClaimDetail />} />
+                  <Route path="service-claims/:id" element={<ClaimDetail />} />
                   <Route path="expenses" element={<h1 className="text-2xl font-bold">Expensas</h1>} />
                   <Route path="documents" element={<h1 className="text-2xl font-bold">Documentos</h1>} />
                   <Route path="bookings" element={<h1 className="text-2xl font-bold">Reservas</h1>} />
                   <Route path="owner-unit" element={<OwnerUnit />} />
+                  <Route path="service-claims" element={<ServiceClaims />} />
 
                   {/* Rutas solo para administradores */}
                   <Route
@@ -116,11 +121,14 @@ const App = () => (
                     <Route path="dashboard" element={<Dashboard />} />
                     <Route path="buildings" element={<Buildings />} />
                     <Route path="users" element={<h1 className="text-2xl font-bold">Usuarios</h1>} />
+                    <Route path="users" element={<h1 className="text-2xl font-bold">Usuarios</h1>} />
                     <Route path="settings" element={<h1 className="text-2xl font-bold">Configuración</h1>} />
+                    <Route path="admin/settings" element={<SystemSettings />} />
                     <Route path="building/info" element={<h1 className="text-2xl font-bold">Información del Edificio</h1>} />
                     <Route path="building/units" element={<h1 className="text-2xl font-bold">Unidades</h1>} />
                     <Route path="building/residents" element={<h1 className="text-2xl font-bold">Residentes</h1>} />
                     <Route path="owners" element={<Owners />} />
+                    <Route path="invitations" element={<Invitations />} />
                     <Route path="buildings/:buildingId/owners" element={<OwnersManagement />} />
                     <Route path="spaces" element={<Spaces />} />
                     {/* Ruta solo para SUPER_ADMIN */}

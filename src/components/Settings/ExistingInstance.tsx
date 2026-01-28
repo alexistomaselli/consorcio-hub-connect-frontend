@@ -3,8 +3,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useN8nWebhook } from '@/hooks/useN8nWebhook';
-import { api } from '@/lib/api'; // Importar el cliente API centralizado
+import { evolutionService } from '@/services/evolution';
+import { supabase } from '@/lib/supabase';
 
 import { WhatsAppInstance, WhatsAppInstanceResponse } from '@/types/whatsapp';
 
@@ -22,39 +22,41 @@ export function ExistingInstance({ buildingId, instance: initialInstance, onRefr
 
   // Estado local para mantener la instancia actualizada
   const [instance, setInstance] = useState<WhatsAppInstance>(initialInstance);
-  
-  // Query para obtener el estado actualizado de la instancia usando el endpoint de status
-  const { data: statusData, refetch: refetchStatus } = useQuery<{ success: boolean, data: WhatsAppInstance, message: string }, Error>({
+
+  // Query para obtener el estado actualizado de la instancia usando Evolution API
+  const { data: statusData, refetch: refetchStatus } = useQuery({
     queryKey: ['whatsapp-status-instance', buildingId],
     queryFn: async () => {
-      // Usar el endpoint de status que proporciona datos actualizados
-      console.log(`[ExistingInstance] Consultando estado para ${buildingId}...`);
-      const response = await api.get<{ success: boolean, data: WhatsAppInstance, message: string }>(
-        `/buildings/whatsapp/status/${buildingId}`
-      );
-      return response.data;
+      console.log(`[ExistingInstance] Consultando estado para ${instance.instanceName}...`);
+      return evolutionService.getInstanceStatus(instance.instanceName);
     },
-    refetchInterval: 5000, // Consultar cada 5 segundos
-    enabled: Boolean(buildingId)
+    refetchInterval: 10000,
+    enabled: !!buildingId && !!instance.instanceName
   });
-  
+
   // Actualizar el estado local cuando cambian los datos de status
   useEffect(() => {
-    if (statusData?.data) {
-      console.log('[ExistingInstance] Estado actualizado:', statusData.data.status);
-      setInstance(statusData.data);
+    if (statusData?.instance?.state) {
+      const evolutionState = statusData.instance.state;
+      const newStatus = evolutionState === 'open' ? 'CONNECTED' : 'DISCONNECTED';
+
+      if (instance.status !== newStatus) {
+        setInstance(prev => ({ ...prev, status: newStatus }));
+        // Sync with Supabase
+        evolutionService.updateBuildingWhatsapp(buildingId, {
+          ...instance,
+          status: newStatus
+        });
+      }
     }
-  }, [statusData?.data]);
-  
+  }, [statusData]);
+
   // Actualizar también cuando cambia initialInstance desde las props
   useEffect(() => {
     setInstance(initialInstance);
   }, [initialInstance?.id, initialInstance?.status]);
-  
-  
-  // Obtener los webhooks necesarios
-  const { data: connectWebhook } = useN8nWebhook('whatsapp_connect');
-  const { data: disconnectWebhook } = useN8nWebhook('whatsapp_disconnect');
+
+
 
   // Efecto para el contador del QR
   useEffect(() => {
@@ -80,65 +82,22 @@ export function ExistingInstance({ buildingId, instance: initialInstance, onRefr
 
   // Función para obtener el código QR
   const handleGetQr = async () => {
-    if (!connectWebhook?.data?.data?.prodUrl) {
-      setError('No se pudo obtener la URL del webhook');
-      return;
-    }
-
     try {
       setIsGeneratingQr(true);
       setError(null);
 
-      const response = await fetch(connectWebhook.data.data.prodUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          instanceName: instance.instanceName
-        }),
-      });
+      const response = await evolutionService.getConnectQr(instance.instanceName);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.message?.includes('READONLY')) {
-          throw new Error('Error al vincular: El servidor de WhatsApp está en modo de solo lectura. Por favor, intente más tarde o contacte al soporte técnico.');
-        }
-        throw new Error('Error al generar el código QR');
+      if (response.base64) {
+        setQrCode(response.base64);
+        setTimeLeft(40);
+        onRefresh();
+      } else {
+        throw new Error('No se pudo obtener el código QR. Intente nuevamente.');
       }
-
-      const data = await response.json();
-      console.log('Respuesta de n8n:', data);
-
-      if (data.success && data.qr_base64) {
-      try {
-        // Obtener solo la parte de datos del base64 (por si viene con el prefijo data:image)
-        const base64Data = data.qr_base64.includes(',') 
-          ? data.qr_base64.split(',')[1] 
-          : data.qr_base64;
-
-        // Limpiar el string base64
-        let cleanBase64 = base64Data
-          .replace(/\s/g, '') // Eliminar espacios y saltos de línea
-          .trim(); // Eliminar espacios al inicio y final
-
-        console.log('QR Code base64 original:', data.qr_base64.substring(0, 50) + '...');
-        console.log('QR Code base64 limpio:', cleanBase64.substring(0, 50) + '...');
-        console.log('Longitud del base64:', cleanBase64.length);
-        
-        setQrCode(cleanBase64);
-        setTimeLeft(40); // Iniciar el contador en 40 segundos
-        onRefresh(); // Actualizar el estado de la instancia
-      } catch (error) {
-        console.error('Error procesando QR base64:', error);
-        throw new Error('Error al procesar el código QR: ' + error.message);
-      }
-    } else {
-      throw new Error('No se pudo generar el código QR');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
-      toast.error(err instanceof Error ? err.message : 'Error desconocido');
+    } catch (err: any) {
+      setError(err.message || 'Error al conectar con Evolution API');
+      toast.error('Error al generar QR. Asegúrese de que la instancia esté activa.');
     } finally {
       setIsGeneratingQr(false);
     }
@@ -147,38 +106,17 @@ export function ExistingInstance({ buildingId, instance: initialInstance, onRefr
   // Desconectar instancia
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      if (!disconnectWebhook?.data?.data?.prodUrl) {
-        throw new Error('No se encontró el webhook de desconexión');
-      }
-
-      if (!instance.instanceName) {
-        throw new Error('No se encontró el nombre de la instancia');
-      }
-
-      try {
-        // Desconectar en Evolution API a través de n8n
-        const n8nResponse = await fetch(disconnectWebhook.data.data.prodUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ instanceName: instance.instanceName }),
-        });
-
-        const n8nData = await n8nResponse.json();
-        if (!n8nResponse.ok || !n8nData.success) {
-          throw new Error(n8nData.message || 'Error al desconectar la instancia en Evolution API');
-        }
-
-        return n8nData;
-      } catch (error) {
-        console.error('Error al desconectar:', error);
-        throw error;
-      }
+      if (!instance.instanceName) throw new Error('Nombre de instancia no encontrado');
+      await evolutionService.logoutInstance(instance.instanceName);
+      await evolutionService.updateBuildingWhatsapp(buildingId, {
+        ...instance,
+        status: 'DISCONNECTED'
+      });
     },
     onSuccess: () => {
       toast.success('Instancia desconectada correctamente');
       onRefresh();
+      refetchStatus();
       setError(null);
     },
     onError: (error: Error) => {
@@ -190,19 +128,19 @@ export function ExistingInstance({ buildingId, instance: initialInstance, onRefr
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Estado: <span 
-          className={`font-medium ${instance.status === 'CONNECTED' 
+        Estado: <span
+          className={`font-medium ${instance.status === 'CONNECTED'
             ? 'text-green-600'
             : instance.status === 'PENDING'
-            ? 'text-yellow-600'
-            : 'text-red-600'
-          }`}
+              ? 'text-yellow-600'
+              : 'text-red-600'
+            }`}
         >
-          {instance.status === 'CONNECTED' 
+          {instance.status === 'CONNECTED'
             ? 'CONECTADO'
             : instance.status === 'PENDING'
-            ? 'CONECTANDO'
-            : 'DESCONECTADO'}
+              ? 'CONECTANDO'
+              : 'DESCONECTADO'}
         </span>
       </p>
 
@@ -221,7 +159,7 @@ export function ExistingInstance({ buildingId, instance: initialInstance, onRefr
           <div className="flex justify-center">
             <div className="bg-white p-4 rounded-lg shadow">
               {qrCode ? (
-                <img 
+                <img
                   src={`data:image/png;base64,${qrCode}`}
                   onError={(e) => {
                     console.error('Error al cargar el QR:', e);

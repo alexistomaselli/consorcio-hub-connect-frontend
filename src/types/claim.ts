@@ -22,8 +22,30 @@ export interface ClaimComment {
   id: string;
   content: string;
   userId: string;
+  user?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  attachments?: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ClaimHistory {
+  id: string;
+  claimId: string;
+  changedBy: string;
+  changeType: string; // 'status_change', 'assignment', 'creation', 'comment'
+  previousStatus?: string;
+  newStatus?: string;
+  details?: any;
+  createdAt: string;
+  user?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
 }
 
 export interface Attachment {
@@ -38,11 +60,17 @@ export interface Claim {
   id: string;
   title: string;
   description: string;
+  category?: string;
   status: ClaimStatus;
-  buildingId?: string; // Agregado para compatibilidad con la implementación de edición
+  buildingId?: string;
+  building?: {
+    id: string;
+    name: string;
+  };
   location: ClaimLocation;
   locationDetail?: string;
   unitId?: string;
+  spaceId?: string;
   unit?: {
     id: string;
     number: string;
@@ -66,9 +94,15 @@ export interface Claim {
     role?: string;
   };
   serviceProviderId?: string;
+  serviceProvider?: {
+    id: string;
+    name: string;
+  };
   priority: ClaimPriority;
-  comments: ClaimComment[];
+  comments?: ClaimComment[];
+  history?: ClaimHistory[];
   images: string[];
+  unitNumber?: string;
   attachments?: Attachment[];
   createdAt: string;
   updatedAt: string;

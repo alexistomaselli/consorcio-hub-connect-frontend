@@ -3,8 +3,10 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 
 const LandingNavbar = () => {
+    const { currentUser, logout } = useAuth();
     const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
 
@@ -88,19 +90,45 @@ const LandingNavbar = () => {
 
                         {/* Desktop Actions */}
                         <div className="hidden md:flex items-center gap-4">
-                            <Link to="/login" className="text-sm font-semibold text-slate-700 hover:text-blue-500 dark:text-slate-200 transition-colors">
-                                Ingresar
-                            </Link>
-                            <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transform hover:-translate-y-0.5">
-                                Prueba Gratis
-                            </Link>
+                            {!currentUser ? (
+                                <>
+                                    <Link to="/login" className="text-sm font-semibold text-slate-700 hover:text-blue-500 dark:text-slate-200 transition-colors">
+                                        Ingresar
+                                    </Link>
+                                    <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transform hover:-translate-y-0.5">
+                                        Prueba Gratis
+                                    </Link>
+                                </>
+                            ) : (
+                                <>
+                                    <Link
+                                        to={currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'BUILDING_ADMIN' ? "/dashboard" : "/my-claims"}
+                                        className="bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transform hover:-translate-y-0.5"
+                                    >
+                                        Ir al Panel
+                                    </Link>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => logout()}
+                                        className="text-sm font-semibold text-slate-700 hover:text-red-500 dark:text-slate-200 transition-colors h-auto p-0 hover:bg-transparent"
+                                    >
+                                        Cerrar Sesión
+                                    </Button>
+                                </>
+                            )}
                         </div>
 
                         {/* Mobile Menu Trigger */}
                         <div className="md:hidden flex items-center gap-4">
-                            <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-all shadow-md">
-                                Prueba Gratis
-                            </Link>
+                            {!currentUser ? (
+                                <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-all shadow-md">
+                                    Prueba Gratis
+                                </Link>
+                            ) : (
+                                <Link to={currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'BUILDING_ADMIN' ? "/dashboard" : "/my-claims"} className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-all shadow-md">
+                                    Panel
+                                </Link>
+                            )}
                             <Sheet open={isOpen} onOpenChange={setIsOpen}>
                                 <SheetTrigger asChild>
                                     <Button variant="ghost" size="icon" className="text-slate-700 dark:text-white">
@@ -120,8 +148,25 @@ const LandingNavbar = () => {
                                         <MobileLink to="/#planes">Planes</MobileLink>
                                         <MobileLink to="/#contacto">Contacto</MobileLink>
                                         <div className="h-px bg-slate-200 dark:bg-slate-800 my-2"></div>
-                                        <MobileLink to="/login">Ingresar</MobileLink>
-                                        <MobileLink to="/register">Crear Cuenta</MobileLink>
+                                        {!currentUser ? (
+                                            <>
+                                                <MobileLink to="/login">Ingresar</MobileLink>
+                                                <MobileLink to="/register">Crear Cuenta</MobileLink>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <MobileLink to={currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'BUILDING_ADMIN' ? "/dashboard" : "/my-claims"}>Ir al Panel</MobileLink>
+                                                <button
+                                                    onClick={() => {
+                                                        logout();
+                                                        setIsOpen(false);
+                                                    }}
+                                                    className="text-lg font-medium text-red-500 hover:text-red-600 transition-colors py-2 text-left"
+                                                >
+                                                    Cerrar Sesión
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </SheetContent>
                             </Sheet>

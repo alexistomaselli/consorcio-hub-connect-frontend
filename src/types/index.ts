@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'user' | 'BUILDING_ADMIN' | 'SUPER_ADMIN' | 'OWNER';
+export type UserRole = 'admin' | 'user' | 'BUILDING_ADMIN' | 'SUPER_ADMIN' | 'OWNER' | 'RESIDENT' | 'SERVICE_PROVIDER';
 
 export interface BuildingData {
   address: string;
@@ -257,3 +257,27 @@ export interface Unit {
   observations?: string;
 }
 
+export enum InvitationRole {
+  OWNER = 'OWNER',
+  RESIDENT = 'RESIDENT'
+}
+
+export enum InvitationStatus {
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  EXPIRED = 'EXPIRED'
+}
+
+export interface PlatformInvitation {
+  id: string;
+  buildingId: string;
+  unitId: string;
+  email: string;
+  role: InvitationRole;
+  token: string;
+  status: InvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  isResident?: boolean;
+}

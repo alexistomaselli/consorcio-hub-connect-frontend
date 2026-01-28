@@ -28,8 +28,14 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
 
   // Si se requiere rol de admin y el usuario no tiene permisos suficientes
   if (requiredRole === 'admin' && !['admin', 'SUPER_ADMIN', 'BUILDING_ADMIN'].includes(currentUser?.role || '')) {
-    // Redirigir a los propietarios a sus reclamos, a otros usuarios a otra página
-    return <Navigate to={currentUser?.role === 'OWNER' ? '/my-claims' : '/unauthorized'} replace />;
+    // Redirigir según el rol
+    if (['OWNER', 'RESIDENT'].includes(currentUser?.role || '')) {
+      return <Navigate to="/my-claims" replace />;
+    }
+    if (currentUser?.role === 'SERVICE_PROVIDER') {
+      return <Navigate to="/service-claims" replace />;
+    }
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return <>{children}</>;

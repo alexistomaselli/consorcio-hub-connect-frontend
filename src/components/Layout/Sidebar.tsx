@@ -19,9 +19,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface Props { }
+interface Props {
+  className?: string;
+  onNavItemClick?: () => void;
+}
 
-export function Sidebar({ }: Props) {
+export function Sidebar({ className, onNavItemClick }: Props) {
   const { logout, currentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -58,41 +61,47 @@ export function Sidebar({ }: Props) {
       roles: ['BUILDING_ADMIN'] as UserRole[]
     },
     {
+      title: "Invitaciones",
+      icon: Megaphone, // Using Megaphone as placeholder icon, previously 'invitations' wasn't there
+      path: "/invitations",
+      roles: ['BUILDING_ADMIN'] as UserRole[]
+    },
+    {
       title: "Usuarios",
       icon: Users,
       path: "/users",
       roles: ['SUPER_ADMIN'] as UserRole[]
     },
     {
-      title: "Expensas", // Matches "Finanzas" concept
+      title: "Expensas",
       icon: Wallet,
       path: "/expenses",
-      roles: ['USER', 'BUILDING_ADMIN', 'OWNER'] as UserRole[]
+      roles: ['BUILDING_ADMIN', 'OWNER', 'RESIDENT'] as UserRole[]
     },
     {
       title: "Reclamos",
       icon: ClipboardList,
       path: "/claims",
-      roles: ['USER', 'BUILDING_ADMIN'] as UserRole[]
+      roles: ['BUILDING_ADMIN', 'RESIDENT'] as UserRole[]
     },
     {
       title: "Mis Reclamos",
       icon: ClipboardList,
       path: "/my-claims",
-      roles: ['OWNER'] as UserRole[]
+      roles: ['OWNER', 'RESIDENT'] as UserRole[]
     },
     {
-      title: "Comunicados", // New item to match screenshot structure if it exists, otherwise placeholder or mapped
+      title: "Comunicados",
       icon: Megaphone,
-      path: "/announcements", // Assuming functionality might effectively exist or be planned
-      roles: ['BUILDING_ADMIN', 'USER'] as UserRole[],
-      hidden: true // Hiding for now if route doesn't exist, remove hidden if we want to show it
+      path: "/announcements",
+      roles: ['BUILDING_ADMIN', 'OWNER', 'RESIDENT'] as UserRole[],
+      hidden: true
     },
     {
       title: "Reservas",
       icon: Calendar,
       path: "/bookings",
-      roles: ['USER', 'BUILDING_ADMIN'] as UserRole[]
+      roles: ['BUILDING_ADMIN', 'OWNER', 'RESIDENT'] as UserRole[]
     },
     {
       title: "Espacios",
@@ -105,6 +114,12 @@ export function Sidebar({ }: Props) {
       icon: Wrench,
       path: "/services",
       roles: ['SUPER_ADMIN'] as UserRole[]
+    },
+    {
+      title: "Trabajos Asignados",
+      icon: Wrench,
+      path: "/service-claims",
+      roles: ['SERVICE_PROVIDER'] as UserRole[]
     }
   ];
 
@@ -130,7 +145,7 @@ export function Sidebar({ }: Props) {
   const showSettings = settingsItem.roles.includes(currentUser?.role as UserRole);
 
   return (
-    <div className="flex h-full flex-col bg-white border-r border-slate-200">
+    <div className={cn("flex h-full flex-col bg-white border-r border-slate-200", className)}>
       {/* Sidebar Header */}
       <div className="p-6 pb-2">
         <div className="flex items-center gap-3 mb-6">
@@ -142,7 +157,9 @@ export function Sidebar({ }: Props) {
           </div>
           <div>
             <h1 className="font-bold text-slate-900 text-lg leading-tight">ConsorcioHub</h1>
-            <p className="text-xs text-slate-500 font-medium tracking-wide">Panel de Admin</p>
+            <p className="text-xs text-slate-500 font-medium tracking-wide">
+              {currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'BUILDING_ADMIN' ? 'Panel de Admin' : 'Mi Panel'}
+            </p>
           </div>
         </div>
       </div>
@@ -156,7 +173,10 @@ export function Sidebar({ }: Props) {
               <Button
                 key={index}
                 variant="ghost"
-                onClick={() => navigate(item.path)}
+                onClick={() => {
+                  navigate(item.path);
+                  if (onNavItemClick) onNavItemClick();
+                }}
                 className={cn(
                   "w-full justify-start h-11 mb-1 font-medium transition-all duration-200",
                   active
@@ -177,7 +197,10 @@ export function Sidebar({ }: Props) {
         {showSettings && (
           <Button
             variant="ghost"
-            onClick={() => navigate(settingsItem.path)}
+            onClick={() => {
+              navigate(settingsItem.path);
+              if (onNavItemClick) onNavItemClick();
+            }}
             className={cn(
               "w-full justify-start h-11 font-medium transition-all duration-200",
               isActive(settingsItem.path)
@@ -193,7 +216,10 @@ export function Sidebar({ }: Props) {
         {currentUser?.role === 'SUPER_ADMIN' && (
           <Button
             variant="ghost"
-            onClick={() => navigate(globalSettingsItem.path)}
+            onClick={() => {
+              navigate(globalSettingsItem.path);
+              if (onNavItemClick) onNavItemClick();
+            }}
             className={cn(
               "w-full justify-start h-11 font-medium transition-all duration-200",
               isActive(globalSettingsItem.path)

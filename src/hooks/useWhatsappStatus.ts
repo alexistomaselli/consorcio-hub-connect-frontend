@@ -1,3 +1,4 @@
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useEffect } from 'react';
 
@@ -22,17 +23,15 @@ export const useWhatsappStatus = (): WhatsappInstanceStatus => {
 
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/buildings/whatsapp/${currentUser.buildingId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const { data, error: sbError } = await supabase
+        .from('buildings')
+        .select('whatsapp')
+        .eq('id', currentUser.buildingId)
+        .single();
 
-      setExists(response.ok);
+      if (sbError) throw sbError;
+
+      setExists(!!data?.whatsapp);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Error checking WhatsApp instance'));
       setExists(false);

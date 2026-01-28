@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { api } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { BuildingOwnership, GlobalOwner, Invitation, Unit } from '../types';
 
 interface OwnerWithUnits extends GlobalOwner {
@@ -24,29 +24,53 @@ export const OwnersManagement = () => {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
   // Cargar propietarios y unidades disponibles
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        console.log('Cargando propietarios para el edificio:', buildingId);
+        if (!buildingId) return;
 
-        // Usar api.get en lugar de fetch para incluir automáticamente el token y la URL base
-        const [ownersResponse, unitsResponse, invitationsResponse] = await Promise.all([
-          api.get<OwnerWithUnits[]>(`/owners/buildings/${buildingId}`),
-          api.get<Unit[]>(`/buildings/${buildingId}/units?available=true`),
-          api.get<Invitation[]>(`/owners/buildings/${buildingId}/invitations`)
-        ]);
+        // 1. Get Units and their Owners
+        const { data: unitsData, error: unitsError } = await supabase
+          .from('units')
+          .select(`
+            *,
+            owner:users!units_ownerId_fkey(*)
+          `)
+          .eq('buildingId', buildingId);
 
-        console.log('Datos de propietarios recibidos:', ownersResponse.data);
+        if (unitsError) throw unitsError;
 
-        // Asegurarnos de que los datos son arrays
-        const ownersData = Array.isArray(ownersResponse.data) ? ownersResponse.data : [];
-        const unitsData = Array.isArray(unitsResponse.data) ? unitsResponse.data : [];
-        const invitationsData = Array.isArray(invitationsResponse.data) ? invitationsResponse.data : [];
-        
-        setOwners(ownersData);
-        setAvailableUnits(unitsData);
-        setPendingInvitations(invitationsData);
+        // 2. Get Pending Invitations
+        const { data: invitesData, error: invitesError } = await supabase
+          .from('platform_invitations')
+          .select('*')
+          .eq('buildingId', buildingId)
+          .eq('status', 'PENDING');
+
+        if (invitesError) throw invitesError;
+
+        // Process Owners (Mocking the structure to match OwnerWithUnits as per current UI needs)
+        // In a real scenario, this would involve a complex join or a specific view
+        const uniqueOwnersMap = new Map<string, OwnerWithUnits>();
+        unitsData?.forEach((u: any) => {
+          if (u.owner) {
+            const o = u.owner;
+            if (!uniqueOwnersMap.has(o.id)) {
+              uniqueOwnersMap.set(o.id, {
+                ...o,
+                ownership: { status: 'ACTIVE' }, // Default for mock
+                units: [u]
+              });
+            } else {
+              uniqueOwnersMap.get(o.id)!.units.push(u);
+            }
+          }
+        });
+
+        setOwners(Array.from(uniqueOwnersMap.values()));
+        setAvailableUnits(unitsData?.filter((u: any) => !u.ownerId) || []);
+        setPendingInvitations(invitesData || []);
       } catch (error) {
         console.error('Error al cargar datos:', error);
         toast({
@@ -62,28 +86,46 @@ export const OwnersManagement = () => {
     if (buildingId) {
       fetchData();
     }
-  }, [buildingId]);
+  }, [buildingId, toast]);
 
-  const handleInviteOwner = async (data: Omit<Invitation, 'id' | 'buildingId' | 'status' | 'token' | 'expiresAt' | 'createdAt'>) => {
+  const handleInviteOwner = async (data: any) => {
     try {
-      const response = await fetch(`/owners/buildings/${buildingId}/invite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      if (!buildingId) return;
 
-      if (!response.ok) {
-        throw new Error('Error al enviar la invitación');
-      }
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      const token = crypto.randomUUID();
+
+      const { error } = await supabase
+        .from('platform_invitations')
+        .insert({
+          buildingId,
+          email: data.email || (data as any).whatsappNumber, // Fallback if needed
+          role: 'OWNER',
+          firstName: data.firstName,
+          lastName: data.lastName,
+          token,
+          expiresAt: expiresAt.toISOString(),
+          status: 'PENDING',
+          updatedAt: new Date().toISOString()
+        });
+
+      if (error) throw error;
 
       toast({
         title: 'Invitación enviada',
-        description: 'Se ha enviado la invitación al propietario correctamente.',
+        description: 'Se ha registrado la invitación correctamente.',
       });
 
       setInviteDialogOpen(false);
+      // Refresh
+      const { data: updatedInvites } = await supabase
+        .from('platform_invitations')
+        .select('*')
+        .eq('buildingId', buildingId)
+        .eq('status', 'PENDING');
+      setPendingInvitations(updatedInvites || []);
+
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -107,9 +149,11 @@ export const OwnersManagement = () => {
               <DialogTitle>Invitar Nuevo Propietario</DialogTitle>
             </DialogHeader>
             <InvitationForm
-              buildingId={buildingId}
+              buildingId={buildingId || ''}
               availableUnits={availableUnits}
-              onSubmit={handleInviteOwner}
+              onSubmit={async (data) => {
+                await handleInviteOwner(data);
+              }}
             />
           </DialogContent>
         </Dialog>
@@ -122,9 +166,8 @@ export const OwnersManagement = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Unidad</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Rol</TableHead>
                 <TableHead>Fecha de Invitación</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -133,24 +176,21 @@ export const OwnersManagement = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10">
+                  <TableCell colSpan={5} className="text-center py-10">
                     Cargando...
                   </TableCell>
                 </TableRow>
               ) : pendingInvitations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10">
+                  <TableCell colSpan={5} className="text-center py-10">
                     No hay invitaciones pendientes
                   </TableCell>
                 </TableRow>
               ) : (
-                pendingInvitations.map((invitation) => (
+                pendingInvitations.map((invitation: any) => (
                   <TableRow key={invitation.id}>
-                    <TableCell>
-                      {invitation.firstName} {invitation.lastName}
-                    </TableCell>
-                    <TableCell>{invitation.whatsappNumber}</TableCell>
-                    <TableCell>{invitation.units[0]}</TableCell>
+                    <TableCell>{invitation.email}</TableCell>
+                    <TableCell>{invitation.role}</TableCell>
                     <TableCell>
                       {new Date(invitation.createdAt).toLocaleDateString()}
                     </TableCell>
@@ -207,7 +247,7 @@ export const OwnersManagement = () => {
                       {owner.firstName} {owner.lastName}
                     </TableCell>
                     <TableCell>
-                      {owner.documentType} {owner.documentNumber}
+                      {owner.documentNumber || '-'}
                     </TableCell>
                     <TableCell>{owner.email}</TableCell>
                     <TableCell>
@@ -215,13 +255,12 @@ export const OwnersManagement = () => {
                     </TableCell>
                     <TableCell>
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          owner.ownership.status === 'ACTIVE'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${owner.ownership?.status === 'ACTIVE'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                          }`}
                       >
-                        {owner.ownership.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
+                        {owner.ownership?.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">

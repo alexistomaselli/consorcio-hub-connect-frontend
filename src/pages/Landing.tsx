@@ -1,6 +1,5 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import LandingNavbar from '@/components/Layout/LandingNavbar';
 import LandingFooter from '@/components/Layout/LandingFooter';
 
@@ -18,7 +17,12 @@ import LandingFooter from '@/components/Layout/LandingFooter';
  */
 
 export default function Landing() {
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
+
+  const panelPath = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'BUILDING_ADMIN'
+    ? "/dashboard"
+    : "/my-claims";
 
   return (
     <div className="font-sans antialiased bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col min-h-screen">
@@ -44,10 +48,17 @@ export default function Landing() {
             Centralice la comunicación, automatice tareas y mejore la experiencia de administradores y residentes. Todo gestionado desde una plataforma intuitiva y conectada a WhatsApp.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="w-full sm:w-auto inline-flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white font-semibold px-8 py-4 rounded-xl text-base transition-all shadow-xl shadow-blue-500/25 hover:shadow-2xl hover:shadow-blue-500/40 transform hover:-translate-y-1">
-              Comenzar prueba de 14 días
-              <span className="material-symbols-outlined ml-2">arrow_forward</span>
-            </Link>
+            {!currentUser ? (
+              <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="w-full sm:w-auto inline-flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white font-semibold px-8 py-4 rounded-xl text-base transition-all shadow-xl shadow-blue-500/25 hover:shadow-2xl hover:shadow-blue-500/40 transform hover:-translate-y-1">
+                Comenzar prueba de 14 días
+                <span className="material-symbols-outlined ml-2">arrow_forward</span>
+              </Link>
+            ) : (
+              <Link to={panelPath} className="w-full sm:w-auto inline-flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-white font-semibold px-8 py-4 rounded-xl text-base transition-all shadow-xl shadow-blue-500/25 hover:shadow-2xl hover:shadow-blue-500/40 transform hover:-translate-y-1">
+                Ir a mi Panel de Control
+                <span className="material-symbols-outlined ml-2">dashboard</span>
+              </Link>
+            )}
             <a href="#demo" className="w-full sm:w-auto inline-flex items-center justify-center bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-white font-semibold px-8 py-4 rounded-xl text-base border border-slate-200 dark:border-slate-700 transition-colors shadow-sm">
               <span className="material-symbols-outlined mr-2 text-blue-500">play_circle</span>
               Ver demostración
@@ -128,9 +139,15 @@ export default function Landing() {
                 <span className="ml-1 text-slate-500">/mes</span>
               </div>
               <p className="mt-2 text-sm text-slate-500">Perfecto para probar la plataforma.</p>
-              <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="mt-8 block w-full py-3 px-6 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-sm font-medium text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                Empezar Gratis
-              </Link>
+              {!currentUser ? (
+                <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="mt-8 block w-full py-3 px-6 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-sm font-medium text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                  Empezar Gratis
+                </Link>
+              ) : (
+                <Link to={panelPath} className="mt-8 block w-full py-3 px-6 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-sm font-medium text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                  Ir al Panel
+                </Link>
+              )}
               <ul className="mt-8 space-y-4 text-sm text-slate-600 dark:text-slate-300">
                 <li className="flex items-center"><span className="material-symbols-outlined text-emerald-500 text-lg mr-2">check</span>Hasta 10 unidades</li>
                 <li className="flex items-center"><span className="material-symbols-outlined text-emerald-500 text-lg mr-2">check</span>Gestión de reclamos</li>
@@ -150,9 +167,15 @@ export default function Landing() {
                 <span className="ml-1 text-slate-500">/mes</span>
               </div>
               <p className="mt-2 text-sm text-slate-500">Para edificios en crecimiento y modernos.</p>
-              <Link to="/register" state={{ selectedPlan: { name: 'Profesional', price: 29 } }} className="mt-8 block w-full py-3 px-6 bg-blue-500 hover:bg-blue-600 rounded-xl text-center text-sm font-medium text-white transition-colors shadow-lg shadow-blue-500/30">
-                Seleccionar Pro
-              </Link>
+              {!currentUser ? (
+                <Link to="/register" state={{ selectedPlan: { name: 'Profesional', price: 29 } }} className="mt-8 block w-full py-3 px-6 bg-blue-500 hover:bg-blue-600 rounded-xl text-center text-sm font-medium text-white transition-colors shadow-lg shadow-blue-500/30">
+                  Seleccionar Pro
+                </Link>
+              ) : (
+                <Link to={panelPath} className="mt-8 block w-full py-3 px-6 bg-blue-500 hover:bg-blue-600 rounded-xl text-center text-sm font-medium text-white transition-colors shadow-lg shadow-blue-500/30">
+                  Ir al Panel
+                </Link>
+              )}
               <ul className="mt-8 space-y-4 text-sm text-slate-600 dark:text-slate-300">
                 <li className="flex items-center"><span className="material-symbols-outlined text-emerald-500 text-lg mr-2">check</span>Hasta 50 unidades</li>
                 <li className="flex items-center"><span className="material-symbols-outlined text-emerald-500 text-lg mr-2">check</span><strong>Integración con WhatsApp</strong></li>
@@ -170,9 +193,15 @@ export default function Landing() {
                 <span className="ml-1 text-slate-500">/mes</span>
               </div>
               <p className="mt-2 text-sm text-slate-500">Gestión integral para grandes complejos.</p>
-              <Link to="/register" state={{ selectedPlan: { name: 'Empresarial', price: 59 } }} className="mt-8 block w-full py-3 px-6 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-sm font-medium text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
-                Contactar Ventas
-              </Link>
+              {!currentUser ? (
+                <Link to="/register" state={{ selectedPlan: { name: 'Empresarial', price: 59 } }} className="mt-8 block w-full py-3 px-6 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-sm font-medium text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                  Contactar Ventas
+                </Link>
+              ) : (
+                <Link to={panelPath} className="mt-8 block w-full py-3 px-6 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-sm font-medium text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                  Ir al Panel
+                </Link>
+              )}
               <ul className="mt-8 space-y-4 text-sm text-slate-600 dark:text-slate-300">
                 <li className="flex items-center"><span className="material-symbols-outlined text-emerald-500 text-lg mr-2">check</span>Unidades ilimitadas</li>
                 <li className="flex items-center"><span className="material-symbols-outlined text-emerald-500 text-lg mr-2">check</span>Todo lo de Pro</li>
@@ -196,9 +225,15 @@ export default function Landing() {
               Únase a más de 500 edificios que ya gestionan su comunidad de forma inteligente.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-10">
-              <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="bg-white text-blue-600 hover:bg-blue-50 font-bold py-3 px-8 rounded-xl shadow-lg transition-colors">
-                Registrarse Ahora
-              </Link>
+              {!currentUser ? (
+                <Link to="/register" state={{ selectedPlan: { name: 'Inicial', price: 0 } }} className="bg-white text-blue-600 hover:bg-blue-50 font-bold py-3 px-8 rounded-xl shadow-lg transition-colors">
+                  Registrarse Ahora
+                </Link>
+              ) : (
+                <Link to={panelPath} className="bg-white text-blue-600 hover:bg-blue-50 font-bold py-3 px-8 rounded-xl shadow-lg transition-colors">
+                  Ir a mi Panel
+                </Link>
+              )}
               <a href="#contacto" className="bg-blue-700 text-white hover:bg-blue-800 font-bold py-3 px-8 rounded-xl border border-blue-500 transition-colors">
                 Agendar Demo
               </a>

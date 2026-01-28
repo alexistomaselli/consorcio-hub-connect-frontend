@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import MyPropertiesDashboard from './MyPropertiesDashboard';
 import { useClaims } from '@/context/ClaimsContext';
 import {
   Wallet,
@@ -20,6 +21,10 @@ import { Button } from "@/components/ui/button";
 const Dashboard = () => {
   const { currentUser } = useAuth();
   const { claims } = useClaims();
+
+  if (currentUser?.role === 'OWNER' || currentUser?.role === 'RESIDENT') {
+    return <MyPropertiesDashboard />;
+  }
 
   const buildingClaims = useMemo(() => {
     if (!currentUser?.buildingId) return [];

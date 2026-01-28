@@ -35,9 +35,13 @@ interface FormData {
   };
 }
 
-export default function Profile() {
+import UserProfile from "./UserProfile";
+
+function BuildingProfileWizard() {
   const { currentUser, updateUser } = useAuth();
   const navigate = useNavigate();
+  // ... (rest of existing logic)
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState<number>(1);
 
@@ -401,4 +405,14 @@ export default function Profile() {
       </div>
     </WizardLayout>
   );
+}
+
+export default function Profile() {
+  const { currentUser } = useAuth();
+
+  if (currentUser?.role === 'BUILDING_ADMIN' || currentUser?.role === 'SUPER_ADMIN') {
+    return <BuildingProfileWizard />;
+  }
+
+  return <UserProfile />;
 }

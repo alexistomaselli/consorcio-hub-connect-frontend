@@ -39,6 +39,7 @@ interface AuthContextType {
   updateUser: (data: Partial<ExtendedUser>) => Promise<void>;
   isAuthenticated: boolean;
   isEmailVerified: boolean;
+  getAuthHeaders: () => Record<string, string>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,8 +47,22 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<ExtendedUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
+
+  const getAuthHeaders = () => {
+    return {
+      'Authorization': `Bearer ${token || localStorage.getItem('token')}`,
+    };
+  };
 
   const fetchUserProfile = async (session: any) => {
+    if (session?.access_token) {
+      setToken(session.access_token);
+      localStorage.setItem('token', session.access_token);
+    } else {
+      setToken(null);
+      localStorage.removeItem('token');
+    }
     if (!session?.user) {
       setCurrentUser(null);
       setLoading(false);
@@ -234,6 +249,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         updateUser,
         isAuthenticated: !!currentUser,
         isEmailVerified: !!currentUser?.email_confirmed_at,
+        getAuthHeaders,
       }}
     >
       {children}
