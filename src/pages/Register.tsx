@@ -9,10 +9,7 @@ const Register = () => {
   const location = useLocation();
   const selectedPlan = location.state?.selectedPlan;
 
-  // Si no hay plan seleccionado, redirigir a la landing
-  if (!selectedPlan) {
-    return <Navigate to="/" replace />;
-  }
+  // Si no hay plan seleccionado, se usará uno por defecto en el formulario
 
   return (
     <div className="font-sans antialiased bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col min-h-screen">

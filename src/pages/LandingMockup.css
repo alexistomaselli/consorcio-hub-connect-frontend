@@ -1,0 +1,11 @@
+.landing-mockup-page {
+  min-height: 100vh;
+  background: #f6f7f8;
+}
+
+.landing-mockup-frame {
+  display: block;
+  width: 100%;
+  min-height: 100vh;
+  border: 0;
+}

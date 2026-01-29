@@ -14,6 +14,7 @@ import { Layout } from "./components/Layout/Layout";
 
 // Páginas
 import Landing from "./pages/Landing";
+import LandingV2 from "./pages/LandingV2";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import RegisterUser from "./pages/RegisterUser";
@@ -49,7 +50,8 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               {/* Rutas públicas */}
-              <Route path="/" element={<Landing />} />
+              <Route path="/" element={<LandingV2 />} />
+              <Route path="/v1" element={<Landing />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/register-user" element={<RegisterUser />} />

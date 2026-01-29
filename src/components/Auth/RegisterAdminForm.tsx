@@ -51,13 +51,25 @@ interface Plan {
 }
 
 interface RegisterAdminFormProps {
-  selectedPlan: Plan;
+  selectedPlan?: Plan;
 }
 
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 const RegisterAdminForm = ({ selectedPlan }: RegisterAdminFormProps) => {
   const { registerAdmin } = useAuth();
+
+  // Default plan if none selected
+  const defaultPlan: Plan = {
+    name: "Plan Básico",
+    price: 0,
+    description: "Plan gratuito inicial",
+    features: [],
+    popular: false,
+    disabled: false
+  };
+
+  const activePlan = selectedPlan || defaultPlan;
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -92,7 +104,7 @@ const RegisterAdminForm = ({ selectedPlan }: RegisterAdminFormProps) => {
         email: data.email,
         password: data.password,
         buildingName: data.buildingName,
-        planName: selectedPlan.name
+        planName: activePlan.name
       };
 
       const result = await registerAdmin(registerData);
