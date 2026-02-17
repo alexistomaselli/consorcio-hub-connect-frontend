@@ -323,9 +323,7 @@ DATABASE_URL=postgresql://admin:admin123@postgres:5432/consorcio_hub
 - ⏳ Gestión de archivos para imágenes-ui
 - Tailwind CSS
 
-## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/b581c6c0-951d-4569-95f8-51328c7c58a7) and click on Share -> Publish.
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!
